@@ -2,14 +2,11 @@ name: Update Schedule
 
 on:
   schedule:
-    # Каждый день в 06:00 UTC = 09:00 МСК
-    - cron: "0 6 * * *"
-  workflow_dispatch: # Ручной запуск из GitHub UI
+    - cron: "0 6 * * *"  # 09:00 МСК
+  workflow_dispatch:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   update:
@@ -26,20 +23,37 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install beautifulsoup4 icalendar requests playwright
+          pip install beautifulsoup4 icalendar requests playwright openpyxl
           playwright install --with-deps chromium
 
-      - name: Parse schedule (next 14 days via Playwright)
+      - name: Check site availability
+        id: check
         run: |
-          python parse_schedule.py --playwright --days 14 --output schedule.ics
-          echo "ICS_UPDATED=true" >> $GITHUB_ENV
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 https://rasp.spbgasu.ru/ || echo "000")
+          echo "Site status: $STATUS"
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Parse schedule (live)
+        if: steps.check.outputs.status == '200'
+        run: python parse_schedule.py --days 14 --output schedule.ics
+
+      - name: Parse schedule (fallback HTML)
+        if: steps.check.outputs.status != '200'
+        run: |
+          echo "[WARN] Сайт недоступен (статус ${{ steps.check.outputs.status }}), использую fallback HTML"
+          if [ -f saved_resource.html ]; then
+            python parse_schedule.py --file saved_resource.html --days 14 --output schedule.ics
+          else
+            echo "[ERROR] Fallback HTML не найден в репозитории"
+            exit 1
+          fi
 
       - name: Check for changes
         id: diff
         run: |
           git diff --quiet schedule.ics && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
 
-      - name: Commit and push if changed
+      - name: Commit if changed
         if: steps.diff.outputs.changed == 'true'
         run: |
           git config user.name  "github-actions[bot]"
