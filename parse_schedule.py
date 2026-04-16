@@ -92,12 +92,12 @@ def fetch_html_playwright() -> str | None:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(extra_http_headers=HEADERS)
             page.goto(SCHEDULE_URL, wait_until="domcontentloaded", timeout=90000)
-            page.wait_for_selector(".get_data", timeout=30000)
+            page.wait_for_selector(".get_data", timeout=60000)
 
             group_el = page.locator(f".get_data[data-search='{GROUP}']")
             if group_el.count():
                 group_el.first.click()
-                page.wait_for_selector(".lesson", timeout=30000)
+                page.wait_for_selector(".lesson", timeout=60000)
             else:
                 search = page.locator("input[data-var='GROUPS']")
                 if search.count():
@@ -106,7 +106,7 @@ def fetch_html_playwright() -> str | None:
                     result = page.locator(f".get_data[data-search='{GROUP}']")
                     if result.count():
                         result.first.click()
-                        page.wait_for_selector(".lesson", timeout=30000)
+                        page.wait_for_selector(".lesson", timeout=60000)
 
             html = page.content()
             browser.close()
@@ -344,6 +344,11 @@ def main():
         html = fetch_html_playwright()
         if html:
             lessons = parse_html(html)
+        if not lessons:
+            html = load_fallback_html()
+            if html:
+                lessons = parse_html(html)
+                print("[WARN] Playwright не сработал — использую fallback HTML")
     else:
         # Автоматический режим: Excel → HTML requests → Playwright → fallback
         lessons = fetch_excel()
