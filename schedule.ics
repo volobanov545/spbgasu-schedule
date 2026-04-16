@@ -2,9 +2,30 @@ BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//СПбГАСУ Schedule//3-СУЗСс-2//RU
 CALSCALE:GREGORIAN
-X-WR-CALDESC:Расписание. Обновлено 17.04.2026
+X-WR-CALDESC:Расписание. Обновлено 16.04.2026
 X-WR-CALNAME:СПбГАСУ 3-СУЗСс-2
 X-WR-TIMEZONE:Europe/Moscow
+BEGIN:VEVENT
+SUMMARY:Сопротивление материалов. Основы те
+ ории упругости и пластичности (л.)
+DTSTART:20260416T090000
+DTEND:20260416T103000
+UID:0b63abcb2a7314aa5e46f964e916d3bb@spbgasu
+DESCRIPTION:Преподаватель: Островская Н.В.\n1 п
+ ара\nНеделя №33: Числитель с 13.04.2026 по 19.04.20
+ 26
+LOCATION:701/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Механика жидкости и газа ()
+DTSTART:20260416T104500
+DTEND:20260416T121500
+UID:de886a28195394ba778ea1f9910506af@spbgasu
+DESCRIPTION:Преподаватель: Гурдин Р.А.\, Романо
+ ва Ю.В.\n2 пара\nНеделя №33: Числитель с 13.04.2
+ 026 по 19.04.2026
+LOCATION:226/Г
+END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
  ории упругости и пластичности ()
