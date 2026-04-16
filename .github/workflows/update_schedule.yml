@@ -1,9 +1,7 @@
 name: Update Schedule
 
 on:
-  schedule:
-    - cron: "0 6 * * *"  # 09:00 МСК
-  workflow_dispatch:
+  workflow_dispatch:  # Только ручной запуск (основной источник — локальный cron)
 
 permissions:
   contents: write
@@ -22,46 +20,17 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: |
-          pip install beautifulsoup4 icalendar requests playwright openpyxl
-          playwright install --with-deps chromium
+        run: pip install beautifulsoup4 icalendar requests openpyxl
 
-      - name: Check site availability
-        id: check
-        run: |
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 https://rasp.spbgasu.ru/ || echo "000")
-          echo "Site status: $STATUS"
-          echo "status=$STATUS" >> $GITHUB_OUTPUT
-
-      - name: Parse schedule (live)
-        if: steps.check.outputs.status == '200'
-        run: python parse_schedule.py --days 14 --output schedule.ics
-
-      - name: Parse schedule (fallback HTML)
-        if: steps.check.outputs.status != '200'
-        run: |
-          echo "[WARN] Сайт недоступен (статус ${{ steps.check.outputs.status }}), использую fallback HTML"
-          if [ -f saved_resource.html ]; then
-            python parse_schedule.py --file saved_resource.html --days 14 --output schedule.ics
-          else
-            echo "[ERROR] Fallback HTML не найден в репозитории"
-            exit 1
-          fi
-
-      - name: Check for changes
-        id: diff
-        run: |
-          git diff --quiet schedule.ics && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+      - name: Parse from fallback HTML
+        run: python parse_schedule.py --file saved_resource.html --days 14 --output schedule.ics
 
       - name: Commit if changed
-        if: steps.diff.outputs.changed == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add schedule.ics
-          git commit -m "chore: update schedule $(date +'%Y-%m-%d')"
-          git push
-
-      - name: No changes
-        if: steps.diff.outputs.changed == 'false'
-        run: echo "Расписание не изменилось."
+          git diff --quiet schedule.ics && echo "Без изменений" || (
+            git add schedule.ics &&
+            git commit -m "chore: manual update $(date +'%Y-%m-%d')" &&
+            git push
+          )
