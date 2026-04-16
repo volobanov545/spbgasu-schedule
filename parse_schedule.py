@@ -22,7 +22,7 @@ from bs4 import BeautifulSoup
 from icalendar import Calendar, Event
 from icalendar.prop import vText
 
-GROUP = "3-СУЗСс-2"
+GROUP = "3-СУЗСс-2"  # последняя цифра = номер курса (2→3→4 каждый сентябрь)
 GROUP_ENCODED = "3-%D0%A1%D0%A3%D0%97%D0%A1%D1%81-2"
 SCHEDULE_URL = "https://rasp.spbgasu.ru/"
 EXCEL_URL = f"https://rasp.spbgasu.ru/getExcel.php?TYPE=GROUPS&FIND={GROUP_ENCODED}"
