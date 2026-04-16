@@ -65,7 +65,7 @@ for weekday in [0, 2]:  # 0=ПН, 2=СР
     event.add("summary", "Training")
     event.add("dtstart", dt_start)
     event.add("dtend", dt_end)
-    event.add("rrule", {"freq": "weekly", "byday": day_abbr})
+    event.add("rrule", {"freq": "weekly", "byday": day_abbr, "until": datetime(2026, 5, 31, 21, 0, 0)})
     event.add("uid", make_uid("Training", dt_start))
     training_cal.add_component(event)
 
@@ -85,7 +85,7 @@ event = Event()
 event.add("summary", "Extra Classes (Strength of Materials)")
 event.add("dtstart", dt_start)
 event.add("dtend", dt_end)
-event.add("rrule", {"freq": "weekly", "byday": "TH"})
+event.add("rrule", {"freq": "weekly", "byday": "TH", "until": datetime(2026, 5, 31, 21, 0, 0)})
 event.add("uid", make_uid("ExtraClasses", dt_start))
 classes_cal.add_component(event)
 
