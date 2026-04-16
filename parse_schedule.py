@@ -50,24 +50,25 @@ def fetch_html_playwright() -> str:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(extra_http_headers={"Referer": "https://www.spbgasu.ru/"})
-        page.goto(SCHEDULE_URL, wait_until="networkidle", timeout=60000)
+        page.goto(SCHEDULE_URL, wait_until="domcontentloaded", timeout=90000)
+        # Ждём появления элементов группы (JS инициализация)
+        page.wait_for_selector(".get_data", timeout=30000)
 
         # Ищем и выбираем нашу группу
         group_el = page.locator(f".get_data[data-search='{GROUP}']")
         if group_el.count():
             group_el.first.click()
-            # Ждём появления расписания
-            page.wait_for_selector(".lesson", timeout=15000)
+            page.wait_for_selector(".lesson", timeout=30000)
         else:
             # Попробуем через поле поиска
             search = page.locator("input[data-var='GROUPS']")
             if search.count():
                 search.fill(GROUP)
-                page.wait_for_timeout(800)
+                page.wait_for_timeout(1000)
                 result = page.locator(f".get_data[data-search='{GROUP}']")
                 if result.count():
                     result.first.click()
-                    page.wait_for_selector(".lesson", timeout=15000)
+                    page.wait_for_selector(".lesson", timeout=30000)
 
         html = page.content()
         browser.close()
