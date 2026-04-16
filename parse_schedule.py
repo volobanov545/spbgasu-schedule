@@ -293,8 +293,14 @@ def make_uid(lesson: dict) -> str:
 def build_ics(lessons: list[dict], days_ahead: int | None = None) -> tuple[Calendar, int]:
     today = date.today()
     cutoff = today + timedelta(days=days_ahead) if days_ahead else None
-    start = today - timedelta(days=7)  # хранить ещё неделю назад
-    filtered = [l for l in lessons if l["date"] >= start and (cutoff is None or l["date"] <= cutoff)]
+    # Начало текущей недели (понедельник) минус 7 дней
+    monday = today - timedelta(days=today.weekday())
+    start = monday - timedelta(days=7)
+    # Конец через 3 полные недели от текущего понедельника (числитель→знаменатель→числитель)
+    end = monday + timedelta(weeks=3) - timedelta(days=1)
+    if cutoff:
+        end = min(end, cutoff)
+    filtered = [l for l in lessons if l["date"] >= start and l["date"] <= end]
 
     cal = Calendar()
     cal.add("prodid", "-//СПбГАСУ Schedule//3-СУЗСс-2//RU")
