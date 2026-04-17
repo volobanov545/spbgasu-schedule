@@ -23,7 +23,7 @@ jobs:
         run: pip install beautifulsoup4 icalendar requests openpyxl
 
       - name: Parse schedule
-        run: python parse_schedule.py --days 14 --output schedule.ics
+        run: python parse_schedule.py --output schedule.ics
 
       - name: Commit and push if changed
         run: |
