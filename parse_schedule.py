@@ -28,6 +28,7 @@ SCHEDULE_URL = "https://rasp.spbgasu.ru/"
 EXCEL_URL = f"https://rasp.spbgasu.ru/getExcel.php?TYPE=GROUPS&FIND={GROUP_ENCODED}"
 FALLBACK_HTML = Path(__file__).parent / "saved_resource.html"
 OUTPUT_FILE = Path(__file__).parent / "schedule.ics"
+SESSION_OUTPUT_FILE = Path(__file__).parent / "session.ics"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36",
@@ -78,13 +79,13 @@ def fetch_html_requests() -> str | None:
         return None
 
 
-def fetch_html_playwright() -> str | None:
-    """JS-рендеринг через Playwright."""
+def fetch_html_playwright() -> tuple[str | None, str | None]:
+    """JS-рендеринг через Playwright. Возвращает (html_расписание, html_сессия)."""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         print("[INFO] playwright не установлен")
-        return None
+        return None, None
 
     try:
         print("[INFO] Playwright: запускаю браузер...")
@@ -109,16 +110,29 @@ def fetch_html_playwright() -> str | None:
                         page.wait_for_selector(".lesson", timeout=60000)
 
             html = page.content()
+
+            # Проверяем наличие вкладки Сессия
+            session_html = None
+            session_tab = page.locator("#pills-tab .nav-link").filter(
+                has_text=re.compile(r"сессия", re.IGNORECASE)
+            )
+            if session_tab.count():
+                print("[INFO] Playwright: обнаружена вкладка Сессия, загружаю...")
+                session_tab.first.click()
+                page.wait_for_timeout(3000)
+                session_html = page.content()
+                print("[OK] Playwright: данные сессии получены")
+
             browser.close()
 
         if GROUP not in html:
             print("[INFO] Playwright: данные группы не найдены")
-            return None
+            return None, None
         print(f"[OK] Playwright: {len(html)} байт")
-        return html
+        return html, session_html
     except Exception as e:
         print(f"[INFO] Playwright: {e}")
-        return None
+        return None, None
 
 
 def load_fallback_html() -> str | None:
@@ -127,6 +141,15 @@ def load_fallback_html() -> str | None:
         return FALLBACK_HTML.read_text(encoding="utf-8")
     print(f"[ERROR] Fallback HTML не найден: {FALLBACK_HTML}")
     return None
+
+
+def has_session_tab(html: str) -> bool:
+    """Проверяет наличие вкладки Сессия в навигации."""
+    soup = BeautifulSoup(html, "html.parser")
+    for tab in soup.select("#pills-tab .nav-link"):
+        if re.search(r"сессия", tab.get_text(), re.IGNORECASE):
+            return True
+    return False
 
 
 # ─── Парсинг Excel ───────────────────────────────────────────────────────────
@@ -283,6 +306,76 @@ def parse_html(html: str) -> list[dict]:
     return lessons
 
 
+def parse_session_html(html: str) -> list[dict]:
+    """Парсит экзамены из вкладки Сессия (#pills-S)."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Ищем блок сессии
+    session_block = soup.select_one("#pills-S")
+    if not session_block:
+        # Если вкладка уже активна — парсим всю страницу как сессионную
+        session_block = soup
+
+    lessons = []
+
+    # Пробуем ту же структуру что и у обычного расписания
+    for week_item in session_block.select(".item"):
+        time_div = week_item.select_one(".time")
+        week_info = clean(time_div.get_text()) if time_div else ""
+
+        for day_div in week_item.select(".days"):
+            day_name_div = day_div.select_one(".week_day")
+            if not day_name_div:
+                continue
+            date_div = day_name_div.select_one(".date")
+            if not date_div:
+                continue
+            lesson_date = parse_date(date_div.get_text())
+            if not lesson_date:
+                continue
+
+            for lesson in day_div.select(".lesson"):
+                day_name_block = lesson.select_one(".day_name")
+                if not day_name_block:
+                    continue
+
+                pair_tag = day_name_block.select_one("b")
+                pair_text = clean(pair_tag.get_text()) if pair_tag else ""
+                start_t, end_t = parse_time(day_name_block.get_text())
+                if not start_t:
+                    continue
+
+                block = lesson.select_one(".lesson_block")
+                if not block:
+                    continue
+
+                divs = [clean(d.get_text()) for d in block.find_all("div", recursive=False)]
+                if len(divs) < 1:
+                    continue
+
+                subject = divs[0]
+                room = teacher = ""
+                if len(divs) == 4:
+                    room, teacher = divs[2], divs[3]
+                elif len(divs) == 3:
+                    room, teacher = divs[1], divs[2]
+                elif len(divs) == 2:
+                    room = divs[1]
+
+                lessons.append({
+                    "date": lesson_date,
+                    "start": start_t,
+                    "end": end_t,
+                    "pair": pair_text,
+                    "subject": subject,
+                    "room": room,
+                    "teacher": teacher,
+                    "week_info": week_info,
+                })
+
+    return lessons
+
+
 # ─── Генерация ICS ───────────────────────────────────────────────────────────
 
 def make_uid(lesson: dict) -> str:
@@ -331,6 +424,41 @@ def build_ics(lessons: list[dict], days_ahead: int | None = None) -> tuple[Calen
     return cal, len(filtered)
 
 
+def build_session_ics(lessons: list[dict]) -> tuple[Calendar, int]:
+    """Строит ICS для сессии — все экзамены начиная с сегодня."""
+    today = date.today()
+    filtered = sorted(
+        [l for l in lessons if l["date"] >= today],
+        key=lambda l: (l["date"], l["start"])
+    )
+
+    cal = Calendar()
+    cal.add("prodid", "-//СПбГАСУ Session//3-СУЗСс-2//RU")
+    cal.add("version", "2.0")
+    cal.add("calscale", "GREGORIAN")
+    cal.add("x-wr-calname", f"СПбГАСУ {GROUP} — Сессия")
+    cal.add("x-wr-timezone", "Europe/Moscow")
+    cal.add("x-wr-caldesc", f"Экзамены. Обновлено {today.strftime('%d.%m.%Y')}")
+
+    for lesson in filtered:
+        event = Event()
+        event.add("summary", f"📝 {lesson['subject']}")
+        event.add("dtstart", datetime.combine(lesson["date"], lesson["start"]))
+        event.add("dtend", datetime.combine(lesson["date"], lesson["end"]))
+        event.add("location", vText(lesson["room"]))
+
+        desc_parts = []
+        if lesson["teacher"]:
+            desc_parts.append(f"Преподаватель: {lesson['teacher']}")
+        if lesson["pair"]:
+            desc_parts.append(lesson["pair"])
+        event.add("description", vText("\n".join(desc_parts)))
+        event.add("uid", make_uid(lesson) + "-session")
+        cal.add_component(event)
+
+    return cal, len(filtered)
+
+
 # ─── Точка входа ─────────────────────────────────────────────────────────────
 
 def main():
@@ -339,16 +467,21 @@ def main():
     parser.add_argument("--file", type=Path)
     parser.add_argument("--days", type=int, default=None)
     parser.add_argument("--output", type=Path, default=OUTPUT_FILE)
+    parser.add_argument("--session-output", type=Path, default=SESSION_OUTPUT_FILE)
     args = parser.parse_args()
 
     lessons = None
+    session_html = None
 
     if args.file:
         html = args.file.read_text(encoding="utf-8")
         print(f"[INFO] Читаю из файла: {args.file}")
         lessons = parse_html(html)
+        if has_session_tab(html):
+            print("[INFO] В файле обнаружена вкладка Сессия")
+            session_html = html
     elif args.playwright:
-        html = fetch_html_playwright()
+        html, session_html = fetch_html_playwright()
         if html:
             lessons = parse_html(html)
         if not lessons:
@@ -364,9 +497,12 @@ def main():
             html = fetch_html_requests()
             if html:
                 lessons = parse_html(html)
+                if has_session_tab(html):
+                    print("[INFO] requests: обнаружена вкладка Сессия, запускаю Playwright для её загрузки")
+                    _, session_html = fetch_html_playwright()
 
         if not lessons:
-            html = fetch_html_playwright()
+            html, session_html = fetch_html_playwright()
             if html:
                 lessons = parse_html(html)
 
@@ -387,6 +523,18 @@ def main():
     period = f"ближайшие {args.days} дней" if args.days else f"{lessons[0]['date']} — {lessons[-1]['date']}"
     print(f"[OK] Событий в .ics: {count} ({period})")
     print(f"[OK] Сохранено: {args.output}")
+
+    # Сессия
+    if session_html:
+        session_lessons = parse_session_html(session_html)
+        if session_lessons:
+            session_cal, session_count = build_session_ics(session_lessons)
+            args.session_output.write_bytes(session_cal.to_ical())
+            print(f"[OK] Сессия: {session_count} экзаменов → {args.session_output}")
+        else:
+            print("[INFO] Вкладка Сессия есть, но экзаменов не найдено (возможно структура отличается)")
+    else:
+        print("[INFO] Вкладка Сессия не обнаружена — session.ics не обновлялся")
 
 
 if __name__ == "__main__":
