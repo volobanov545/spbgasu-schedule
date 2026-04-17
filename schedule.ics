@@ -492,4 +492,35 @@ DESCRIPTION:Преподаватель: Гурдин Р.А.\, Романо
  026 по 03.05.2026
 LOCATION:226/Г
 END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Сопротивление материалов. Основы те
+ ории упругости и пластичности ()
+DTSTART:20260502T090000
+DTEND:20260502T103000
+UID:8f8d2d342eaa5f7d2fa6d11fd362b46e@spbgasu
+DESCRIPTION:Преподаватель: Алейник В.И.\, Остро
+ вская Н.В.\n1 пара\nНеделя №35: Числитель с 2
+ 7.04.2026 по 03.05.2026
+LOCATION:323/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Инженерная геология (лаб.)
+DTSTART:20260502T104500
+DTEND:20260502T121500
+UID:e36d0404621e5cb241ba452dce5f6830@spbgasu
+DESCRIPTION:Преподаватель: Заводчикова М.Б.\, В
+ ержбицкая Е.Г.\n2 пара\nНеделя №35: Числите
+ ль с 27.04.2026 по 03.05.2026
+LOCATION:206/Е
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Инженерная геология (л.)
+DTSTART:20260502T123000
+DTEND:20260502T140000
+UID:1358e85a16cf44ca09cff89abae39972@spbgasu
+DESCRIPTION:Преподаватель: Заводчикова М.Б.\n3 
+ пара\nНеделя №35: Числитель с 27.04.2026 по 03.05.
+ 2026
+LOCATION:401/С
+END:VEVENT
 END:VCALENDAR
