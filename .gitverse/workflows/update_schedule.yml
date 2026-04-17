@@ -2,10 +2,9 @@ name: Update Schedule
 
 on:
   schedule:
-    - cron: "30 3 * * *"  # 06:30 МСК
-    - cron: "0 10 * * *"  # 13:00 МСК
-    - cron: "0 15 * * *"  # 18:00 МСК
-    - cron: "0 19 * * *"  # 22:00 МСК
+    - cron: "0 4 * * *"   # 07:00 МСК
+    - cron: "30 10 * * *" # 13:30 МСК
+    - cron: "0 18 * * *"  # 21:00 МСК
   workflow_dispatch:
 
 jobs:
