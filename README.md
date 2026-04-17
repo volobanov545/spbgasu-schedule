@@ -1,13 +1,22 @@
 # Расписание СПбГАСУ — 3-СУЗСс-2
 
 Автоматический парсер расписания с [rasp.spbgasu.ru](https://rasp.spbgasu.ru/).  
-Обновляется каждый день в 09:00 МСК через GitHub Actions.
+Обновляется каждый день в 09:00 МСК через GitVerse CI/CD.
+
+Генерирует два календаря:
+- `schedule.ics` — основное расписание (прошлая неделя + текущая + 2 следующие)
+- `session.ics` — экзамены сессии (все экзамены начиная с сегодня)
 
 ## Подписка на календарь
 
-**URL для подписки:**
+### Основное расписание
 ```
-https://<ВАШ_ЛОГИН>.github.io/<ИМЯ_РЕПО>/schedule.ics
+https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/schedule.ics
+```
+
+### Сессия (экзамены)
+```
+https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/session.ics
 ```
 
 ### Яндекс.Календарь
@@ -19,27 +28,52 @@ https://<ВАШ_ЛОГИН>.github.io/<ИМЯ_РЕПО>/schedule.ics
 1. Настройки → **«Добавить календарь»** → **«По URL»**
 2. Вставить URL выше
 
+## Как работает
+
+Парсер пробует источники данных по приоритету:
+
+1. **Excel endpoint** — самый быстрый, без браузера (`/getExcel.php`)
+2. **HTML через requests** — лёгкий запрос без JS-рендеринга
+3. **Playwright** — полноценный браузер (Chromium headless), нужен если сайт требует JS
+4. **Fallback HTML** — `saved_resource.html` из репозитория, если сайт недоступен
+
+При наличии вкладки **«Сессия»** на сайте дополнительно парсятся экзамены → `session.ics`.
+
+GitVerse CI/CD запускает парсер с российских серверов (сайт СПбГАСУ блокирует зарубежные IP).  
+Если расписание изменилось — коммитит обновлённый `.ics` в репозиторий.
+
 ## Локальный запуск
 
 ```bash
 # Установить зависимости
 pip install -r requirements.txt
+pip install openpyxl
 playwright install chromium
 
-# Спарсить из сохранённого HTML
-python parse_schedule.py --file /путь/к/saved_resource.html
-
-# Спарсить живую страницу (нужен Playwright)
-python parse_schedule.py --playwright
+# Автоматический режим (Excel → requests → Playwright → fallback)
+python parse_schedule.py
 
 # Только ближайшие 14 дней
-python parse_schedule.py --playwright --days 14
+python parse_schedule.py --days 14
+
+# Принудительно через Playwright
+python parse_schedule.py --playwright
+
+# Из сохранённого HTML файла
+python parse_schedule.py --file saved_resource.html
+
+# Указать другой выходной файл
+python parse_schedule.py --output my_schedule.ics --session-output my_session.ics
 ```
 
-## Как работает
+Или через готовый скрипт (делает git push после обновления):
+```bash
+bash run_update.sh
+```
 
-1. Playwright открывает `rasp.spbgasu.ru`, выбирает группу `3-СУЗСс-2`
-2. BeautifulSoup парсит HTML: `.item` → `.days` → `.lesson`
-3. Генерирует `schedule.ics` совместимый с Яндекс/Google Calendar
-4. GitHub Actions коммитит файл если расписание изменилось
-5. GitHub Pages отдаёт файл по публичному URL
+## Смена группы (каждый сентябрь)
+
+В `parse_schedule.py` изменить константу `GROUP` — последняя цифра это номер курса:
+```python
+GROUP = "3-СУЗСс-2"  # → "3-СУЗСс-3" на 3 курсе, "3-СУЗСс-4" на 4-м
+```
