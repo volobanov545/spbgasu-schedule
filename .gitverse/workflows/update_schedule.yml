@@ -21,12 +21,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          pip install beautifulsoup4 icalendar requests playwright openpyxl
-          playwright install --with-deps chromium
+        run: pip install beautifulsoup4 icalendar requests openpyxl
 
       - name: Parse schedule
-        run: python parse_schedule.py --playwright --days 14 --output schedule.ics
+        run: python parse_schedule.py --days 14 --output schedule.ics
 
       - name: Commit and push if changed
         run: |
