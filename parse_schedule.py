@@ -389,8 +389,9 @@ def build_ics(lessons: list[dict], days_ahead: int | None = None) -> tuple[Calen
     # Начало текущей недели (понедельник) минус 7 дней
     monday = today - timedelta(days=today.weekday())
     start = monday - timedelta(days=7)
-    # Конец через 3 полные недели от текущего понедельника (числитель→знаменатель→числитель)
-    end = monday + timedelta(weeks=3) - timedelta(days=1)
+    # 3 воскресенья вперёд от сегодня — независимо от дня недели
+    days_to_next_sunday = (6 - today.weekday()) % 7 or 7
+    end = today + timedelta(days=days_to_next_sunday) + timedelta(weeks=2)
     if cutoff:
         end = min(end, cutoff)
     filtered = [l for l in lessons if l["date"] >= start and l["date"] <= end]
