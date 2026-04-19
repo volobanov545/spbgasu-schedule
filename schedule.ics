@@ -2,7 +2,7 @@ BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//СПбГАСУ Schedule//3-СУЗСс-2//RU
 CALSCALE:GREGORIAN
-X-WR-CALDESC:Расписание. Обновлено 18.04.2026
+X-WR-CALDESC:Расписание. Обновлено 19.04.2026
 X-WR-CALNAME:СПбГАСУ 3-СУЗСс-2
 X-WR-TIMEZONE:Europe/Moscow
 BEGIN:VEVENT
@@ -522,5 +522,108 @@ DESCRIPTION:Преподаватель: Заводчикова М.Б.\n3
  пара\nНеделя №35: Числитель с 27.04.2026 по 03.05.
  2026
 LOCATION:401/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Информационные технологии графичес
+ кого проектирования (пр.)
+DTSTART:20260504T090000
+DTEND:20260504T103000
+UID:8470112386bab6fb163b39243859e518@spbgasu
+DESCRIPTION:Преподаватель: Хиврич М.А.\n1 пара\n
+ Неделя №36: Знаменатель с 04.05.2026 по 10.05.2026
+LOCATION:330-4*/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Сопротивление материалов. Основы те
+ ории упругости и пластичности ()
+DTSTART:20260504T104500
+DTEND:20260504T121500
+UID:28400ddf0785469145c0927491a5de17@spbgasu
+DESCRIPTION:Преподаватель: Алейник В.И.\, Остро
+ вская Н.В.\n2 пара\nНеделя №36: Знаменатель 
+ с 04.05.2026 по 10.05.2026
+LOCATION:319/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Метрология\, стандартизация и серти
+ фикация (лаб.)
+DTSTART:20260504T123000
+DTEND:20260504T140000
+UID:093f06783ad6bfbe1009b694c8dc61f6@spbgasu
+DESCRIPTION:Преподаватель: Летенко Д.Г.\, Костр
+ икин М.П.\n3 пара\nНеделя №36: Знаменатель с
+  04.05.2026 по 10.05.2026
+LOCATION:309/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Информационные технологии графичес
+ кого проектирования (пр.)
+DTSTART:20260505T090000
+DTEND:20260505T103000
+UID:36fc9af14ad4696ef71bf97f0887717f@spbgasu
+DESCRIPTION:Преподаватель: Хиврич М.А.\n1 пара\n
+ Неделя №36: Знаменатель с 04.05.2026 по 10.05.2026
+LOCATION:330-5*/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Высшая математика (л.)
+DTSTART:20260505T104500
+DTEND:20260505T121500
+UID:465a22ddca481c17d7047a4d892da773@spbgasu
+DESCRIPTION:Преподаватель: Немченко Е.И.\n2 пар
+ а\nНеделя №36: Знаменатель с 04.05.2026 по 10.05.20
+ 26
+LOCATION:701/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Метрология\, стандартизация и серти
+ фикация (л.)
+DTSTART:20260505T123000
+DTEND:20260505T140000
+UID:9ca7b43aa40717ebc457ca0a2d1341c5@spbgasu
+DESCRIPTION:Преподаватель: Норин В.А.\n3 пара\nН
+ еделя №36: Знаменатель с 04.05.2026 по 10.05.2026
+LOCATION:409/Г
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Механика жидкости и газа (л.)
+DTSTART:20260506T090000
+DTEND:20260506T103000
+UID:302098c258d036d0d0cf7f91845ac824@spbgasu
+DESCRIPTION:Преподаватель: Романова Ю.В.\n1 пар
+ а\nНеделя №36: Знаменатель с 04.05.2026 по 10.05.20
+ 26
+LOCATION:349/А
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Инженерная геология (л.)
+DTSTART:20260506T104500
+DTEND:20260506T121500
+UID:1ade1928f77ada3757a8ec784ab304ce@spbgasu
+DESCRIPTION:Преподаватель: Заводчикова М.Б.\n2 
+ пара\nНеделя №36: Знаменатель с 04.05.2026 по 10
+ .05.2026
+LOCATION:701/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Сопротивление материалов. Основы те
+ ории упругости и пластичности (л.)
+DTSTART:20260507T090000
+DTEND:20260507T103000
+UID:c73e4ef30ef52fe00a9700ea727e68bc@spbgasu
+DESCRIPTION:Преподаватель: Островская Н.В.\n1 п
+ ара\nНеделя №36: Знаменатель с 04.05.2026 по 10.0
+ 5.2026
+LOCATION:701/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Технология бетона (лаб.)
+DTSTART:20260507T104500
+DTEND:20260507T121500
+UID:5419c248ba312a4d0dce19972b14086f@spbgasu
+DESCRIPTION:Преподаватель: Хренов Г.М.\, Черевк
+ о С.А.\n2 пара\nНеделя №36: Знаменатель с 04.05
+ .2026 по 10.05.2026
+LOCATION:102/С
 END:VEVENT
 END:VCALENDAR
