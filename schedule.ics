@@ -2,7 +2,7 @@ BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//СПбГАСУ Schedule//3-СУЗСс-2//RU
 CALSCALE:GREGORIAN
-X-WR-CALDESC:Расписание. Обновлено 21.04.2026
+X-WR-CALDESC:Расписание. Обновлено 22.04.2026
 X-WR-CALNAME:СПбГАСУ 3-СУЗСс-2
 X-WR-TIMEZONE:Europe/Moscow
 BEGIN:VEVENT
