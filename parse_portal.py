@@ -153,16 +153,16 @@ async def login(page):
     page.set_default_timeout(90000)
     await page.goto(f"{PORTAL_URL}/auth/", wait_until="domcontentloaded", timeout=90000)
 
-    # Ждём появления полей
-    login_input = page.locator("input").nth(0)
-    pass_input  = page.locator("input").nth(1)
-    await login_input.wait_for(timeout=30000)
+    # Bitrix CMS: поля называются USER_LOGIN и USER_PASSWORD
+    login_sel = "input[name='USER_LOGIN'], input[name='login'], input[placeholder='Логин']"
+    pass_sel  = "input[name='USER_PASSWORD'], input[name='password'], input[placeholder='Пароль']"
 
-    # Кликаем и вводим посимвольно (надёжнее для SPA-форм)
-    await login_input.click()
-    await login_input.press_sequentially(PORTAL_LOGIN, delay=50)
-    await pass_input.click()
-    await pass_input.press_sequentially(PORTAL_PASS, delay=50)
+    await page.wait_for_selector(login_sel, state="visible", timeout=30000)
+
+    await page.click(login_sel)
+    await page.press_sequentially(login_sel, PORTAL_LOGIN, delay=50)
+    await page.click(pass_sel)
+    await page.press_sequentially(pass_sel, PORTAL_PASS, delay=50)
 
     await page.screenshot(path=str(Path(__file__).parent / "debug_login.png"))
     print("[DEBUG] Форма заполнена, отправляю...")
