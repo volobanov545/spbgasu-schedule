@@ -152,14 +152,25 @@ def extract_event(tag, current_date) -> dict | None:
 async def login(page):
     page.set_default_timeout(90000)
     await page.goto(f"{PORTAL_URL}/auth/", wait_until="domcontentloaded", timeout=90000)
-    await page.wait_for_selector("input[type='text'], input[name='login'], input[placeholder='Логин']",
-                                 timeout=30000)
-    await page.fill("input[placeholder='Логин'], input[name='login'], input[type='text']",
-                    PORTAL_LOGIN)
-    await page.fill("input[placeholder='Пароль'], input[name='password'], input[type='password']",
-                    PORTAL_PASS)
-    await page.click("button[type='submit'], input[type='submit'], button:has-text('Войти')")
+
+    # Ждём появления полей
+    login_input = page.locator("input").nth(0)
+    pass_input  = page.locator("input").nth(1)
+    await login_input.wait_for(timeout=30000)
+
+    # Кликаем и вводим посимвольно (надёжнее для SPA-форм)
+    await login_input.click()
+    await login_input.press_sequentially(PORTAL_LOGIN, delay=50)
+    await pass_input.click()
+    await pass_input.press_sequentially(PORTAL_PASS, delay=50)
+
+    await page.screenshot(path=str(Path(__file__).parent / "debug_login.png"))
+    print("[DEBUG] Форма заполнена, отправляю...")
+
+    await page.locator("button[type='submit'], button:has-text('Войти')").click()
     await page.wait_for_load_state("domcontentloaded", timeout=60000)
+    await page.wait_for_timeout(3000)
+    await page.screenshot(path=str(Path(__file__).parent / "debug_after_login.png"), full_page=True)
     print(f"[INFO] Авторизация: {page.url}")
 
 

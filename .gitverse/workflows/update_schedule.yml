@@ -28,6 +28,17 @@ jobs:
           PORTAL_PASS:  ${{ secrets.PORTAL_PASS }}
         run: python parse_portal.py
 
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug
+          path: |
+            debug_schedule.html
+            debug_schedule.png
+            debug_login.png
+            debug_after_login.png
+
       - name: Sync to Яндекс.Календарь
         env:
           YANDEX_LOGIN:   ${{ secrets.YANDEX_LOGIN }}
