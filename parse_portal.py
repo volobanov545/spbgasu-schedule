@@ -167,9 +167,11 @@ async def login(page):
     await page.screenshot(path=str(Path(__file__).parent / "debug_login.png"))
     print("[DEBUG] Форма заполнена, отправляю...")
 
-    await page.locator(pass_sel).press("Enter")
-    await page.wait_for_load_state("domcontentloaded", timeout=60000)
-    await page.wait_for_timeout(3000)
+    # Ждём навигации явно
+    async with page.expect_navigation(timeout=60000):
+        await page.evaluate("document.querySelector('form').submit()")
+
+    await page.wait_for_timeout(2000)
     await page.screenshot(path=str(Path(__file__).parent / "debug_after_login.png"), full_page=True)
     print(f"[INFO] Авторизация: {page.url}")
 
