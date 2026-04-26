@@ -36,9 +36,11 @@ def main():
     principal = client.principal()
     calendars = principal.calendars()
 
-    calendar = next((c for c in calendars if c.name == CAL_NAME), None)
+    is_new = False
+    calendar = next((c for c in calendars if c.get_display_name() == CAL_NAME), None)
     if calendar is None:
         calendar = principal.make_calendar(name=CAL_NAME)
+        is_new = True
         print(f"[INFO] Создан новый календарь: {CAL_NAME}")
     else:
         print(f"[INFO] Найден календарь: {CAL_NAME}")
@@ -54,24 +56,25 @@ def main():
             continue
         uid = str(component.get("UID"))
         single = Calendar()
-        single.add("prodid", "-//SPbGASU Schedule//RU")
+        single.add("prodid", "-//SPbГАСУ Schedule//RU")
         single.add("version", "2.0")
         single.add_component(component)
         new_events[uid] = single.to_ical()
 
-    # Удаляем события которых больше нет
+    # Удаляем события которых больше нет (пропускаем для нового календаря)
     deleted = 0
-    for event in calendar.events():
-        try:
-            ec = Calendar.from_ical(event.data)
-            for comp in ec.walk():
-                if comp.name == "VEVENT":
-                    uid = str(comp.get("UID"))
-                    if uid not in new_events:
-                        event.delete()
-                        deleted += 1
-        except Exception as e:
-            print(f"[WARN] {e}")
+    if not is_new:
+        for event in calendar.events():
+            try:
+                ec = Calendar.from_ical(event.data)
+                for comp in ec.walk():
+                    if comp.name == "VEVENT":
+                        uid = str(comp.get("UID"))
+                        if uid not in new_events:
+                            event.delete()
+                            deleted += 1
+            except Exception as e:
+                print(f"[WARN] {e}")
 
     # Добавляем / обновляем события
     synced = 0
