@@ -262,11 +262,13 @@ async def async_main():
 
         await login(page)
 
-        # Проверяем что залогинились
-        if "/auth" in page.url:
+        # Bitrix после логина остаётся на /auth/ — проверяем по содержимому
+        page_text = await page.inner_text("body")
+        if "USER_LOGIN" in await page.content() and "авторизовались" not in page_text:
             print("[ERROR] Авторизация не прошла — проверь PORTAL_LOGIN/PORTAL_PASS")
             await browser.close()
             sys.exit(1)
+        print("[INFO] Авторизация успешна")
 
         await go_to_schedule(page)
 
