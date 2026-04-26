@@ -20,10 +20,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install beautifulsoup4 icalendar requests openpyxl caldav
+        run: pip install beautifulsoup4 icalendar requests caldav playwright && playwright install chromium
 
-      - name: Parse schedule
-        run: python parse_schedule.py --output schedule.ics
+      - name: Parse schedule from portal
+        env:
+          PORTAL_LOGIN: ${{ secrets.PORTAL_LOGIN }}
+          PORTAL_PASS:  ${{ secrets.PORTAL_PASS }}
+        run: python parse_portal.py
 
       - name: Sync to Яндекс.Календарь
         env:
