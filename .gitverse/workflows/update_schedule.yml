@@ -20,7 +20,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install beautifulsoup4 icalendar requests caldav playwright && playwright install chromium
+        run: pip install beautifulsoup4 icalendar requests caldav playwright && playwright install-deps chromium && playwright install chromium
 
       - name: Parse schedule from portal
         env:
