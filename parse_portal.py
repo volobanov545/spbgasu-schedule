@@ -167,7 +167,7 @@ async def login(page):
     await page.screenshot(path=str(Path(__file__).parent / "debug_login.png"))
     print("[DEBUG] Форма заполнена, отправляю...")
 
-    await page.locator("button[type='submit'], button:has-text('Войти')").click()
+    await page.locator(pass_sel).press("Enter")
     await page.wait_for_load_state("domcontentloaded", timeout=60000)
     await page.wait_for_timeout(3000)
     await page.screenshot(path=str(Path(__file__).parent / "debug_after_login.png"), full_page=True)
