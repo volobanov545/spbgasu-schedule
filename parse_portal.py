@@ -159,10 +159,10 @@ async def login(page):
 
     await page.wait_for_selector(login_sel, state="visible", timeout=30000)
 
-    await page.click(login_sel)
-    await page.press_sequentially(login_sel, PORTAL_LOGIN, delay=50)
-    await page.click(pass_sel)
-    await page.press_sequentially(pass_sel, PORTAL_PASS, delay=50)
+    await page.locator(login_sel).click()
+    await page.locator(login_sel).press_sequentially(PORTAL_LOGIN, delay=50)
+    await page.locator(pass_sel).click()
+    await page.locator(pass_sel).press_sequentially(PORTAL_PASS, delay=50)
 
     await page.screenshot(path=str(Path(__file__).parent / "debug_login.png"))
     print("[DEBUG] Форма заполнена, отправляю...")
