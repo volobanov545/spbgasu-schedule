@@ -20,10 +20,16 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install beautifulsoup4 icalendar requests openpyxl
+        run: pip install beautifulsoup4 icalendar requests openpyxl caldav
 
       - name: Parse schedule
         run: python parse_schedule.py --output schedule.ics
+
+      - name: Sync to Яндекс.Календарь
+        env:
+          YANDEX_LOGIN:   ${{ secrets.YANDEX_LOGIN }}
+          YANDEX_APPPASS: ${{ secrets.YANDEX_APPPASS }}
+        run: python sync_yandex.py
 
       - name: Commit and push if changed
         run: |
