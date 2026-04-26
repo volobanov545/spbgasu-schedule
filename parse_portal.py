@@ -150,19 +150,22 @@ def extract_event(tag, current_date) -> dict | None:
 # ─── Playwright ──────────────────────────────────────────────────────────────
 
 async def login(page):
-    await page.goto(f"{PORTAL_URL}/auth/", wait_until="networkidle")
+    page.set_default_timeout(90000)
+    await page.goto(f"{PORTAL_URL}/auth/", wait_until="domcontentloaded", timeout=90000)
+    await page.wait_for_selector("input[type='text'], input[name='login'], input[placeholder='Логин']",
+                                 timeout=30000)
     await page.fill("input[placeholder='Логин'], input[name='login'], input[type='text']",
                     PORTAL_LOGIN)
     await page.fill("input[placeholder='Пароль'], input[name='password'], input[type='password']",
                     PORTAL_PASS)
     await page.click("button[type='submit'], input[type='submit'], button:has-text('Войти')")
-    await page.wait_for_load_state("networkidle")
+    await page.wait_for_load_state("domcontentloaded", timeout=60000)
     print(f"[INFO] Авторизация: {page.url}")
 
 
 async def go_to_schedule(page):
-    await page.goto(f"{PORTAL_URL}/lk/schedule/", wait_until="networkidle")
-    await page.wait_for_load_state("networkidle")
+    await page.goto(f"{PORTAL_URL}/lk/schedule/", wait_until="domcontentloaded", timeout=90000)
+    await page.wait_for_timeout(3000)
     print(f"[INFO] Расписание: {page.url}")
 
 
@@ -253,11 +256,20 @@ async def async_main():
             sys.exit(1)
 
         await go_to_schedule(page)
+
+        # Сохраняем HTML и скриншот для отладки
+        debug_html = Path(__file__).parent / "debug_schedule.html"
+        debug_png  = Path(__file__).parent / "debug_schedule.png"
+        debug_html.write_text(await page.content(), encoding="utf-8")
+        await page.screenshot(path=str(debug_png), full_page=True)
+        print(f"[DEBUG] HTML сохранён: {debug_html}")
+        print(f"[DEBUG] Скриншот сохранён: {debug_png}")
+
         events = await collect_events(page)
         await browser.close()
 
     if not events:
-        print("[ERROR] Не найдено ни одного занятия")
+        print("[WARN] Не найдено ни одного занятия — проверь debug_schedule.html")
         sys.exit(1)
 
     ics_data = build_ics(events)
