@@ -18,7 +18,7 @@ SUMMARY:Сопротивление материалов. Основы те
 DTSTART;TZID=Europe/Moscow:20260420T104500
 DTEND;TZID=Europe/Moscow:20260420T121500
 UID:825df5b94459c39c155250811a8459e0@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\,
+DESCRIPTION:Алейник В.И.\,\, Островская Н.В.
 LOCATION:319/С
 END:VEVENT
 BEGIN:VEVENT
@@ -27,7 +27,7 @@ SUMMARY:Метрология\, стандартизация и серти
 DTSTART;TZID=Europe/Moscow:20260420T123000
 DTEND;TZID=Europe/Moscow:20260420T140000
 UID:c7e9818b2db2d3400b6435c48b9027c5@portal.spbgasu.ru
-DESCRIPTION:Летенко Д.Г.\,
+DESCRIPTION:Летенко Д.Г.\,\, Кострикин М.П.
 LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
@@ -86,7 +86,7 @@ SUMMARY:Технология бетона (лаб.)
 DTSTART;TZID=Europe/Moscow:20260423T104500
 DTEND;TZID=Europe/Moscow:20260423T121500
 UID:975aa7a8b80260ecbc0ebaf55144642d@portal.spbgasu.ru
-DESCRIPTION:Хренов Г.М.\,
+DESCRIPTION:Хренов Г.М.\,\, Черевко С.А.
 LOCATION:102/С
 END:VEVENT
 BEGIN:VEVENT
@@ -95,7 +95,7 @@ SUMMARY:Сопротивление материалов. Основы те
 DTSTART;TZID=Europe/Moscow:20260425T123000
 DTEND;TZID=Europe/Moscow:20260425T140000
 UID:cbf9469865fca552eb8322faab18b940@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\,
+DESCRIPTION:Алейник В.И.\,\, Островская Н.В.
 LOCATION:319/С
 END:VEVENT
 BEGIN:VEVENT
@@ -111,7 +111,7 @@ SUMMARY:Технология бетона (лаб.)
 DTSTART;TZID=Europe/Moscow:20260427T104500
 DTEND;TZID=Europe/Moscow:20260427T121500
 UID:edfea7730cf5f96b34d9ed439e07621f@portal.spbgasu.ru
-DESCRIPTION:Хренов Г.М.\,
+DESCRIPTION:Хренов Г.М.\,\, Черевко С.А.
 LOCATION:102/С
 END:VEVENT
 BEGIN:VEVENT
@@ -162,7 +162,7 @@ SUMMARY:Метрология\, стандартизация и серти
 DTSTART;TZID=Europe/Moscow:20260429T123000
 DTEND;TZID=Europe/Moscow:20260429T140000
 UID:ce3b2b689af437176e7b14496062b29a@portal.spbgasu.ru
-DESCRIPTION:Летенко Д.Г.\,
+DESCRIPTION:Летенко Д.Г.\,\, Кострикин М.П.
 LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
@@ -179,7 +179,7 @@ SUMMARY:Механика жидкости и газа
 DTSTART;TZID=Europe/Moscow:20260430T104500
 DTEND;TZID=Europe/Moscow:20260430T121500
 UID:ab22f9ec2035895184ba572d8d415194@portal.spbgasu.ru
-DESCRIPTION:Гурдин Р.А.\,
+DESCRIPTION:Гурдин Р.А.\,\, Романова Ю.В.
 LOCATION:226/Г
 END:VEVENT
 BEGIN:VEVENT
@@ -188,7 +188,7 @@ SUMMARY:Сопротивление материалов. Основы те
 DTSTART;TZID=Europe/Moscow:20260502T090000
 DTEND;TZID=Europe/Moscow:20260502T103000
 UID:26e39ddd9327b6b2cebc15f7ce5b0834@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\,
+DESCRIPTION:Алейник В.И.\,\, Островская Н.В.
 LOCATION:323/С
 END:VEVENT
 BEGIN:VEVENT
@@ -196,7 +196,7 @@ SUMMARY:Инженерная геология (лаб.)
 DTSTART;TZID=Europe/Moscow:20260502T104500
 DTEND;TZID=Europe/Moscow:20260502T121500
 UID:66c61223b5e78c7c8a79637cc63b89b1@portal.spbgasu.ru
-DESCRIPTION:Заводчикова М.Б.\,
+DESCRIPTION:Заводчикова М.Б.\,\, Вержбицкая Е.Г.
 LOCATION:206/Е
 END:VEVENT
 BEGIN:VEVENT
@@ -222,7 +222,7 @@ SUMMARY:Сопротивление материалов. Основы те
 DTSTART;TZID=Europe/Moscow:20260504T104500
 DTEND;TZID=Europe/Moscow:20260504T121500
 UID:1bc307cea9ae8dc952738dad7f8ffc8f@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\,
+DESCRIPTION:Алейник В.И.\,\, Островская Н.В.
 LOCATION:319/С
 END:VEVENT
 BEGIN:VEVENT
@@ -231,7 +231,7 @@ SUMMARY:Метрология\, стандартизация и серти
 DTSTART;TZID=Europe/Moscow:20260504T123000
 DTEND;TZID=Europe/Moscow:20260504T140000
 UID:17e0fcac7750cbcf44afd803c4815322@portal.spbgasu.ru
-DESCRIPTION:Летенко Д.Г.\,
+DESCRIPTION:Летенко Д.Г.\,\, Кострикин М.П.
 LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
@@ -290,7 +290,7 @@ SUMMARY:Технология бетона (лаб.)
 DTSTART;TZID=Europe/Moscow:20260507T104500
 DTEND;TZID=Europe/Moscow:20260507T121500
 UID:6b11c9b6918c7b7c033d38905efb2e27@portal.spbgasu.ru
-DESCRIPTION:Хренов Г.М.\,
+DESCRIPTION:Хренов Г.М.\,\, Черевко С.А.
 LOCATION:102/С
 END:VEVENT
 BEGIN:VEVENT
@@ -298,7 +298,7 @@ SUMMARY:Технология бетона (лаб.)
 DTSTART;TZID=Europe/Moscow:20260511T104500
 DTEND;TZID=Europe/Moscow:20260511T121500
 UID:4cd4f08084d4337aa5f9a61508aaede7@portal.spbgasu.ru
-DESCRIPTION:Хренов Г.М.\,
+DESCRIPTION:Хренов Г.М.\,\, Черевко С.А.
 LOCATION:102/С
 END:VEVENT
 BEGIN:VEVENT
@@ -349,7 +349,7 @@ SUMMARY:Метрология\, стандартизация и серти
 DTSTART;TZID=Europe/Moscow:20260513T123000
 DTEND;TZID=Europe/Moscow:20260513T140000
 UID:2d45611f63e640a8c079c04b79d27724@portal.spbgasu.ru
-DESCRIPTION:Летенко Д.Г.\,
+DESCRIPTION:Летенко Д.Г.\,\, Кострикин М.П.
 LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
@@ -366,7 +366,7 @@ SUMMARY:Механика жидкости и газа
 DTSTART;TZID=Europe/Moscow:20260514T104500
 DTEND;TZID=Europe/Moscow:20260514T121500
 UID:ba6271129cd42d221316366d21b939a3@portal.spbgasu.ru
-DESCRIPTION:Гурдин Р.А.\,
+DESCRIPTION:Гурдин Р.А.\,\, Романова Ю.В.
 LOCATION:226/Г
 END:VEVENT
 BEGIN:VEVENT
@@ -375,7 +375,7 @@ SUMMARY:Сопротивление материалов. Основы те
 DTSTART;TZID=Europe/Moscow:20260515T104500
 DTEND;TZID=Europe/Moscow:20260515T121500
 UID:7f6821db69e3a71c0790884f8f315f1e@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\,
+DESCRIPTION:Алейник В.И.\,\, Островская Н.В.
 LOCATION:321/С
 END:VEVENT
 BEGIN:VEVENT
@@ -392,7 +392,7 @@ SUMMARY:Сопротивление материалов. Основы те
 DTSTART;TZID=Europe/Moscow:20260516T090000
 DTEND;TZID=Europe/Moscow:20260516T103000
 UID:8a88aa07ecaf9b5c26b2a9bfada238c1@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\,
+DESCRIPTION:Алейник В.И.\,\, Островская Н.В.
 LOCATION:323/С
 END:VEVENT
 BEGIN:VEVENT
@@ -400,7 +400,7 @@ SUMMARY:Инженерная геология (лаб.)
 DTSTART;TZID=Europe/Moscow:20260516T104500
 DTEND;TZID=Europe/Moscow:20260516T121500
 UID:b8dac6bdbba5020c881c87f67796cc75@portal.spbgasu.ru
-DESCRIPTION:Заводчикова М.Б.\,
+DESCRIPTION:Заводчикова М.Б.\,\, Вержбицкая Е.Г.
 LOCATION:206/Е
 END:VEVENT
 BEGIN:VEVENT
