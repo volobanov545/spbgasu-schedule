@@ -14,7 +14,11 @@ import json
 import os
 import re
 import sys
+import threading
 from pathlib import Path
+
+# Не более 3 одновременных браузеров — иначе Amvera контейнер падает по памяти
+_browser_sem = threading.Semaphore(3)
 
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
@@ -271,14 +275,18 @@ def parse_lk_main(portal_login: str, portal_pass: str, student_name: str = "") -
 
 async def _async_quick(portal_login: str, portal_pass: str) -> dict:
     """Только главная /lk/ — без обхода журналов. С кэшем сессии ~10 сек."""
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        context = await browser.new_context()
-        page    = await login_with_session(context, portal_login, portal_pass)
-        await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
-        await page.wait_for_timeout(2000)
-        main_data = parse_main_page(await page.content())
-        await browser.close()
+    _browser_sem.acquire()
+    try:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page    = await login_with_session(context, portal_login, portal_pass)
+            await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
+            await page.wait_for_timeout(2000)
+            main_data = parse_main_page(await page.content())
+            await browser.close()
+    finally:
+        _browser_sem.release()
     return {
         "stats":        main_data["stats"],
         "attestations": main_data["attestations"],

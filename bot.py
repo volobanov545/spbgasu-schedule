@@ -14,6 +14,8 @@ from telegram.ext import (
     ContextTypes,
 )
 
+import caldav
+
 from db import init_db, add_user, set_yandex, approve_user, ban_user, unban_user, remove_user, get_user, get_all_users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -24,6 +26,20 @@ OWNER_ID = int(os.environ["TG_OWNER_ID"])
 
 WAIT_LOGIN, WAIT_PASSWORD, WAIT_YC_CHOICE, WAIT_YC_LOGIN, WAIT_YC_PASS = range(5)
 WAIT_YC2_LOGIN, WAIT_YC2_PASS = range(10, 12)
+
+def _test_yandex(ylogin: str, ypass: str) -> str | None:
+    """Возвращает None если OK, иначе текст ошибки."""
+    try:
+        client = caldav.DAVClient(
+            url="https://caldav.yandex.ru",
+            username=f"{ylogin}@yandex.ru",
+            password=ypass,
+        )
+        client.principal()
+        return None
+    except Exception as e:
+        return str(e)
+
 
 YC_INSTRUCTION = (
     "📅 Чтобы подключить Яндекс.Календарь:\n\n"
@@ -98,7 +114,18 @@ async def got_yc_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    ctx.user_data["yc_pass"] = update.message.text.strip()
+    yc_login = ctx.user_data.get("yc_login", "")
+    yc_pass  = update.message.text.strip()
+    await update.message.reply_text("⏳ Проверяю подключение к Яндекс.Календарю...")
+    err = await asyncio.to_thread(_test_yandex, yc_login, yc_pass)
+    if err:
+        await update.message.reply_text(
+            "❌ Не удалось подключиться. Проверь логин и пароль приложения.\n"
+            "Введи логин Яндекса ещё раз:"
+        )
+        ctx.user_data.pop("yc_login", None)
+        return WAIT_YC_LOGIN
+    ctx.user_data["yc_pass"] = yc_pass
     return await _finish_registration(update, ctx)
 
 
@@ -169,8 +196,18 @@ async def got_yc2_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc2_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    yc_login = ctx.user_data.pop("yc_login", "")
+    yc_login = ctx.user_data.get("yc_login", "")
     yc_pass  = update.message.text.strip()
+    await update.message.reply_text("⏳ Проверяю подключение к Яндекс.Календарю...")
+    err = await asyncio.to_thread(_test_yandex, yc_login, yc_pass)
+    if err:
+        await update.message.reply_text(
+            "❌ Не удалось подключиться. Проверь логин и пароль приложения.\n"
+            "Введи логин Яндекса ещё раз:"
+        )
+        ctx.user_data.pop("yc_login", None)
+        return WAIT_YC2_LOGIN
+    ctx.user_data.pop("yc_login", None)
     set_yandex(update.effective_user.id, yc_login, yc_pass)
     await update.message.reply_text("✅ Яндекс.Календарь подключён!", reply_markup=main_menu())
     return ConversationHandler.END
@@ -258,7 +295,24 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if data == "unregister":
         await query.answer()
-        await cmd_unregister(update, ctx)
+        await query.message.reply_text(
+            "⚠️ Удалить аккаунт? Все данные (логин, пароль, Яндекс) будут удалены.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🗑 Да, удалить", callback_data="confirm_unregister"),
+                InlineKeyboardButton("↩️ Отмена", callback_data="cancel_action"),
+            ]])
+        )
+        return
+
+    if data == "confirm_unregister":
+        await query.answer()
+        remove_user(query.from_user.id)
+        await query.edit_message_text("Аккаунт удалён. Напиши /start чтобы зарегистрироваться снова.")
+        return
+
+    if data == "cancel_action":
+        await query.answer()
+        await query.edit_message_text("Отменено.")
         return
 
     # Админские действия — только для овнера
