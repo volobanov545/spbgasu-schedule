@@ -23,7 +23,9 @@ jobs:
         run: pip install beautifulsoup4 icalendar requests caldav playwright && playwright install-deps chromium && playwright install chromium
 
       - name: Save old schedule
-        run: git show HEAD:schedule.ics > old_schedule.ics 2>/dev/null || touch old_schedule.ics
+        run: |
+          git show HEAD:schedule.ics > old_schedule.ics 2>/dev/null || touch old_schedule.ics
+          git show HEAD:journals_state.json > old_journals_state.json 2>/dev/null || echo '{}' > old_journals_state.json
 
       - name: Parse schedule from portal
         env:
@@ -31,11 +33,18 @@ jobs:
           PORTAL_PASS:  ${{ secrets.PORTAL_PASS }}
         run: python parse_portal.py
 
+      - name: Parse journals from portal
+        env:
+          PORTAL_LOGIN: ${{ secrets.PORTAL_LOGIN }}
+          PORTAL_PASS:  ${{ secrets.PORTAL_PASS }}
+        run: python parse_journals.py
+
       - name: Send notifications
         env:
-          TG_TOKEN:   ${{ secrets.TG_TOKEN }}
-          TG_CHANNEL: ${{ secrets.TG_CHANNEL }}
-        run: python notify.py old_schedule.ics schedule.ics
+          TG_TOKEN:    ${{ secrets.TG_TOKEN }}
+          TG_CHANNEL:  ${{ secrets.TG_CHANNEL }}
+          TG_OWNER_ID: ${{ secrets.TG_OWNER_ID }}
+        run: python notify.py old_schedule.ics schedule.ics old_journals_state.json journals_state.json
 
       - name: Sync to Яндекс.Календарь
         env:
@@ -47,8 +56,8 @@ jobs:
         run: |
           git config user.name  "gitverse-actions"
           git config user.email "actions@gitverse.ru"
-          git diff --quiet schedule.ics && echo "Без изменений" || (
-            git add schedule.ics &&
+          git diff --quiet schedule.ics journals_state.json && echo "Без изменений" || (
+            git add schedule.ics journals_state.json &&
             git commit -m "chore: update schedule $(date +'%Y-%m-%d')" &&
             git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main
           )

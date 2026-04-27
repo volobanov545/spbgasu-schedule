@@ -105,31 +105,78 @@ def build_diff_message(old: dict, new: dict) -> str | None:
 
 # ─── Отправщики ──────────────────────────────────────────────────────────────
 
-def send_telegram(text: str):
-    token   = os.environ.get("TG_TOKEN", "")
-    channel = os.environ.get("TG_CHANNEL", "")
-    if not token or not channel:
-        print("[NOTIFY] TG_TOKEN или TG_CHANNEL не заданы, пропускаю Telegram")
+def _tg_send(chat_id: str, text: str, label: str):
+    token = os.environ.get("TG_TOKEN", "")
+    if not token or not chat_id:
+        print(f"[NOTIFY] {label}: токен или chat_id не заданы, пропускаю")
         return
     import urllib.request, urllib.parse, json
     url  = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = urllib.parse.urlencode({"chat_id": channel, "text": text}).encode()
+    data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
     req  = urllib.request.Request(url, data=data)
     resp = urllib.request.urlopen(req, timeout=15)
     result = json.loads(resp.read())
     if result.get("ok"):
-        print("[NOTIFY] Telegram: отправлено")
+        print(f"[NOTIFY] {label}: отправлено")
     else:
-        print(f"[NOTIFY] Telegram: ошибка — {result}")
+        print(f"[NOTIFY] {label}: ошибка — {result}")
+
+
+def send_telegram(text: str):
+    _tg_send(os.environ.get("TG_CHANNEL", ""), text, "Telegram канал")
+
+
+def send_telegram_dm(text: str):
+    _tg_send(os.environ.get("TG_OWNER_ID", ""), text, "Telegram DM")
+
+
+# ─── Журналы ─────────────────────────────────────────────────────────────────
+
+def load_journal_state(path: str) -> dict:
+    try:
+        return json.loads(open(path, encoding="utf-8").read())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def build_journal_diff_message(old: dict, new: dict) -> str | None:
+    lines = []
+
+    for subject, new_data in new.items():
+        old_data = old.get(subject, {})
+
+        # Новые пропуски
+        old_absences = set(old_data.get("absences", []))
+        new_absences = set(new_data.get("absences", []))
+        added_absences = new_absences - old_absences
+        if added_absences:
+            dates = ", ".join(sorted(added_absences))
+            lines.append(f"❌ Новый пропуск — {subject}\n   {dates}")
+
+        # Изменения в аттестациях
+        old_att = old_data.get("attestations", {})
+        new_att = new_data.get("attestations", {})
+        for col, val in new_att.items():
+            if val and val != old_att.get(col):
+                prev = old_att.get(col, "—")
+                lines.append(f"📋 Аттестация — {subject}\n   {col}: {prev} → {val}")
+
+    if not lines:
+        return None
+
+    return "🎓 Обновления по журналам:\n\n" + "\n\n".join(lines)
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main():
+    import json as _json
+
     if len(sys.argv) < 3:
-        print("Использование: notify.py old.ics new.ics")
+        print("Использование: notify.py old.ics new.ics [old_journals.json new_journals.json]")
         sys.exit(1)
 
+    # Расписание
     old = load_events(sys.argv[1])
     new = load_events(sys.argv[2])
 
@@ -138,11 +185,21 @@ def main():
 
     msg = build_diff_message(old, new)
     if not msg:
-        print("[NOTIFY] Изменений нет, уведомления не нужны")
-        return
+        print("[NOTIFY] Расписание не изменилось")
+    else:
+        print("[NOTIFY] Найдены изменения в расписании, отправляю в канал...")
+        send_telegram(msg)
 
-    print(f"[NOTIFY] Найдены изменения, отправляю уведомления...")
-    send_telegram(msg)
+    # Журналы (опционально)
+    if len(sys.argv) >= 5:
+        old_j = load_journal_state(sys.argv[3])
+        new_j = load_journal_state(sys.argv[4])
+        jmsg = build_journal_diff_message(old_j, new_j)
+        if not jmsg:
+            print("[NOTIFY] Журналы не изменились")
+        else:
+            print("[NOTIFY] Найдены изменения в журналах, отправляю в личку...")
+            send_telegram_dm(jmsg)
 
 
 if __name__ == "__main__":
