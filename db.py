@@ -52,7 +52,11 @@ def init_db():
 def add_user(telegram_id: int, login: str, password: str):
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "INSERT OR REPLACE INTO users (telegram_id, portal_login, portal_pass_enc, approved) VALUES (?, ?, ?, 0)",
+        """INSERT INTO users (telegram_id, portal_login, portal_pass_enc, approved)
+           VALUES (?, ?, ?, 0)
+           ON CONFLICT(telegram_id) DO UPDATE SET
+               portal_login    = excluded.portal_login,
+               portal_pass_enc = excluded.portal_pass_enc""",
         (telegram_id, login, _enc(password)),
     )
     conn.commit()
