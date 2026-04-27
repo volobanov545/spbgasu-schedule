@@ -183,32 +183,25 @@ async def go_to_schedule(page):
 
 
 async def click_arrow(page, direction: str):
-    """Кликает < или > для навигации по неделям."""
-    # Ищем SVG-стрелки или кнопки навигации
-    selectors = (
-        [f"button[aria-label*='редыдущ']", "button.prev", ".schedule-nav button:first-child",
-         "svg[data-icon='chevron-left']", "button:has(svg):first-of-type"]
-        if direction == "prev" else
-        [f"button[aria-label*='ледующ']", "button.next", ".schedule-nav button:last-child",
-         "svg[data-icon='chevron-right']", "button:has(svg):last-of-type"]
-    )
-    for sel in selectors:
-        try:
-            btn = page.locator(sel).first
-            if await btn.is_visible(timeout=2000):
-                await btn.click()
-                await page.wait_for_load_state("networkidle")
-                return
-        except Exception:
-            continue
+    """Кликает кнопку навигации по неделям (PrimeVue pi-chevron)."""
+    icon_class = "pi-chevron-left" if direction == "prev" else "pi-chevron-right"
+    sel = f"button:has(.{icon_class})"
 
-    # Последний вариант — кликнуть по < или > в тексте
-    arrow = "<" if direction == "prev" else ">"
-    try:
-        await page.get_by_text(arrow, exact=True).first.click()
-        await page.wait_for_load_state("networkidle")
-    except Exception as e:
-        print(f"[WARN] Не удалось нажать {arrow}: {e}")
+    # Запоминаем текущую неделю чтобы дождаться смены
+    old_week = await page.locator("span.text-lg.font-semibold").first.inner_text()
+
+    btn = page.locator(sel).first
+    await btn.click(timeout=10000)
+
+    # Ждём пока текст недели изменится (SPA обновляет без перезагрузки)
+    for _ in range(20):
+        await page.wait_for_timeout(500)
+        new_week = await page.locator("span.text-lg.font-semibold").first.inner_text()
+        if new_week != old_week:
+            print(f"[INFO] Переход: {old_week} → {new_week}")
+            return
+
+    print(f"[WARN] Неделя не сменилась после клика {direction}")
 
 
 async def collect_events(page) -> list[dict]:
