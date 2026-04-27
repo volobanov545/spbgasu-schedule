@@ -33,6 +33,15 @@ PORTAL_PASS  = os.environ.get("PORTAL_PASS", "")
 STUDENT_NAME = os.environ.get("STUDENT_NAME", "Лобанов")
 STATE_FILE   = Path(__file__).parent / "journals_state.json"
 SESSION_DIR  = Path(os.environ.get("DATA_DIR", ".")) / "sessions"
+DATA_DIR     = Path(os.environ.get("DATA_DIR", "."))
+
+
+def _save_debug_html(html: str, filename: str):
+    try:
+        (DATA_DIR / filename).write_text(html, encoding="utf-8")
+        log.info("Debug HTML сохранён: %s (%d байт)", filename, len(html))
+    except Exception as e:
+        log.warning("Не удалось сохранить debug HTML: %s", e)
 
 
 # ─── Playwright ───────────────────────────────────────────────────────────────
@@ -284,8 +293,14 @@ async def _async_run_for_user(portal_login: str, portal_pass: str, student_name:
         page    = await browser.new_page()
         await login(page, portal_login, portal_pass)
         await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
-        await page.wait_for_timeout(2000)
-        main_data = parse_main_page(await page.content())
+        try:
+            await page.wait_for_selector("table", timeout=8000)
+        except Exception:
+            log.warning("Таблица на /lk/ не появилась за 8 сек")
+        await page.wait_for_timeout(1500)
+        html = await page.content()
+        _save_debug_html(html, "debug_lk.html")
+        main_data = parse_main_page(html)
         absences  = await collect_journal_absences(page, student_name)
 
         await browser.close()
@@ -309,8 +324,14 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
             context = await browser.new_context()
             page    = await login_with_session(context, portal_login, portal_pass)
             await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
-            await page.wait_for_timeout(2000)
-            main_data = parse_main_page(await page.content())
+            try:
+                await page.wait_for_selector("table", timeout=8000)
+            except Exception:
+                log.warning("Таблица на /lk/ не появилась за 8 сек")
+            await page.wait_for_timeout(1500)
+            html = await page.content()
+            _save_debug_html(html, "debug_lk.html")
+            main_data = parse_main_page(html)
             await browser.close()
     finally:
         _browser_sem.release()
