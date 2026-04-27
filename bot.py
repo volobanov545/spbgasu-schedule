@@ -152,13 +152,23 @@ def reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
     """
     Постоянная клавиатура снизу экрана для одобренных пользователей.
     resize_keyboard=True — кнопки компактные, не занимают пол-экрана.
+    input_field_placeholder — подсказка в поле ввода пока клавиатура активна.
     Кнопка «👥 Пользователи» добавляется только владельцу (OWNER_ID).
+    Для обычного: одна строка [Аттестации | Настройки].
+    Для овнера: [Аттестации | Пользователи] / [Настройки].
     """
-    rows = [[KeyboardButton(BTN_STATS)]]
     if is_owner:
-        rows.append([KeyboardButton(BTN_USERS)])
-    rows.append([KeyboardButton(BTN_SETTINGS)])
-    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+        rows = [
+            [KeyboardButton(BTN_STATS), KeyboardButton(BTN_USERS)],
+            [KeyboardButton(BTN_SETTINGS)],
+        ]
+    else:
+        rows = [[KeyboardButton(BTN_STATS), KeyboardButton(BTN_SETTINGS)]]
+    return ReplyKeyboardMarkup(
+        rows,
+        resize_keyboard=True,
+        input_field_placeholder="Выбери действие...",
+    )
 
 
 # ─── Регистрация (ConversationHandler) ────────────────────────────────────────
@@ -242,19 +252,28 @@ async def got_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Сохраняем пароль и спрашиваем про Яндекс.Календарь."""
+    """
+    Сохраняем пароль и спрашиваем про Яндекс.Календарь.
+    one_time_keyboard=True — клавиатура исчезает сразу после нажатия.
+    Кнопки «✅ Да» / «❌ Нет» избавляют от необходимости что-то печатать.
+    """
     ctx.user_data["password"] = update.message.text.strip()
     await update.message.reply_text(
         "Хочешь подключить Яндекс.Календарь?\n"
-        "Расписание будет автоматически появляться в твоём календаре.\n\n"
-        "Напиши «да» или «нет»:"
+        "Расписание будет автоматически появляться в твоём календаре.",
+        reply_markup=ReplyKeyboardMarkup(
+            [["✅ Да", "❌ Нет"]],
+            one_time_keyboard=True,
+            resize_keyboard=True,
+            input_field_placeholder="Да или Нет...",
+        ),
     )
     return WAIT_YC_CHOICE
 
 
 async def got_yc_choice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Разветвление: да → запрашиваем данные Яндекса, нет → сразу завершаем регистрацию."""
-    if update.message.text.strip().lower() in ("да", "yes", "y", "д"):
+    if update.message.text.strip().lower() in ("да", "yes", "y", "д", "✅ да"):
         await update.message.reply_text(YC_INSTRUCTION)
         return WAIT_YC_LOGIN
     return await _finish_registration(update, ctx)
