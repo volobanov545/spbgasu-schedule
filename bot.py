@@ -159,8 +159,8 @@ def reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
     """
     if is_owner:
         rows = [
-            [KeyboardButton(BTN_STATS), KeyboardButton(BTN_USERS)],
-            [KeyboardButton(BTN_SETTINGS)],
+            [KeyboardButton(BTN_STATS), KeyboardButton(BTN_SETTINGS)],
+            [KeyboardButton(BTN_USERS)],
         ]
     else:
         rows = [[KeyboardButton(BTN_STATS), KeyboardButton(BTN_SETTINGS)]]
