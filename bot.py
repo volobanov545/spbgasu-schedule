@@ -442,6 +442,7 @@ def main():
             WAIT_YC_PASS:   [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc_pass)],
         },
         fallbacks=[CommandHandler("cancel", cmd_cancel)],
+        allow_reentry=True,
     )
 
     yc_handler = ConversationHandler(
