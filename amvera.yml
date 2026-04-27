@@ -3,9 +3,10 @@ meta:
   toolVersion: "3.12"
 
 build:
-  pipInstall:
-    - requirements.txt
+  requirementsPath: requirements.txt
+  useCache: true
 
 run:
-  persistenceMount: /data
+  scriptName: ""
   command: python bot.py
+  persistenceMount: /data
