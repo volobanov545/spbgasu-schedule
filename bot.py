@@ -34,6 +34,13 @@ import logging
 import os
 import re
 import urllib.request
+import warnings
+
+from telegram.warnings import PTBUserWarning
+
+# per_message=False (умолчание) — правильный выбор: entry_point — callback-кнопка,
+# все последующие состояния — текстовые сообщения. PTBUserWarning здесь ложный.
+warnings.filterwarnings("ignore", message=".*per_message=False.*", category=PTBUserWarning)
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
