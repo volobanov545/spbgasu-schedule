@@ -59,11 +59,15 @@ async def login_with_session(context, portal_login: str, portal_pass: str):
         page = await context.new_page()
         await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(2000)
-        if "/auth/" not in page.url:
+        # Портал делает client-side редирект — URL остаётся /lk/ даже если сессия протухла.
+        # Проверяем по наличию формы логина на странице.
+        login_form = await page.query_selector("input[name='USER_LOGIN']")
+        if not login_form:
             log.info("Сессия восстановлена из кэша")
             return page
         await page.close()
-        log.info("Сессия устарела, логинимся заново")
+        sf.unlink(missing_ok=True)
+        log.info("Сессия устарела (форма логина видна), логинимся заново")
 
     page = await context.new_page()
     page.set_default_timeout(60000)
