@@ -109,12 +109,12 @@ def extract_event(card, current_date) -> dict | None:
         if not label:
             continue
         label_text = label.get_text(strip=True)
-        value_span = col.find("span", class_="text-gray-700")
-        value = value_span.get_text(strip=True) if value_span else ""
         if "Аудитория" in label_text:
-            room = value
+            value_span = col.find("span", class_="text-gray-700")
+            room = value_span.get_text(strip=True) if value_span else ""
         elif "Преподаватели" in label_text:
-            teacher = value
+            teacher_spans = col.find_all("span", class_="text-gray-700")
+            teacher = ", ".join(s.get_text(strip=True) for s in teacher_spans if s.get_text(strip=True))
 
     if not subject:
         return None
