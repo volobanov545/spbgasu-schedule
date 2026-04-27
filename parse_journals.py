@@ -20,8 +20,12 @@ from pathlib import Path
 # Не более 3 одновременных браузеров — иначе Amvera контейнер падает по памяти
 _browser_sem = threading.Semaphore(3)
 
+import logging
+
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
+
+log = logging.getLogger(__name__)
 
 PORTAL_URL   = "https://portal.spbgasu.ru"
 PORTAL_LOGIN = os.environ.get("PORTAL_LOGIN", "")
@@ -47,10 +51,10 @@ async def login_with_session(context, portal_login: str, portal_pass: str):
         await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(2000)
         if "/auth/" not in page.url:
-            print("[INFO] Сессия восстановлена из кэша")
+            log.info("Сессия восстановлена из кэша")
             return page
         await page.close()
-        print("[INFO] Сессия устарела, логинимся заново")
+        log.info("Сессия устарела, логинимся заново")
 
     page = await context.new_page()
     page.set_default_timeout(60000)
@@ -63,7 +67,7 @@ async def login_with_session(context, portal_login: str, portal_pass: str):
     await page.wait_for_timeout(2000)
     cookies = await context.cookies()
     sf.write_text(json.dumps(cookies))
-    print("[INFO] Авторизация успешна, сессия сохранена")
+    log.info("Авторизация успешна, сессия сохранена")
     return page
 
 
@@ -78,7 +82,7 @@ async def login(page, login: str = "", password: str = ""):
     async with page.expect_navigation(timeout=60000):
         await page.evaluate("document.querySelector('form').submit()")
     await page.wait_for_timeout(2000)
-    print("[INFO] Авторизация успешна")
+    log.info("Авторизация успешна")
 
 
 # ─── Главная страница: аттестации и сводка посещаемости ──────────────────────
@@ -105,10 +109,10 @@ def parse_main_page(html: str) -> dict:
     # Таблица аттестаций
     attestations = {}
     all_tables = soup.find_all("table")
-    print(f"[DEBUG] Таблиц на странице: {len(all_tables)}")
+    log.info("Таблиц на странице: %d", len(all_tables))
     for table in all_tables:
         headers = [th.get_text(strip=True) for th in table.find_all("th")]
-        print(f"[DEBUG] Заголовки таблицы: {headers[:6]}")
+        log.info("Заголовки таблицы: %s", headers[:6])
         if "1-я атт." not in headers and "2-я атт." not in " ".join(headers):
             continue
         for row in table.find_all("tr")[1:]:
@@ -121,7 +125,7 @@ def parse_main_page(html: str) -> dict:
             if subject:
                 attestations[subject] = {"att1": att1, "att2": att2}
 
-    print(f"[INFO] Главная: {len(attestations)} предметов, посещаемость {stats.get('present_pct', '?')}%")
+    log.info("Главная: %d предметов, посещаемость %s%%", len(attestations), stats.get("present_pct", "?"))
     return {"stats": stats, "attestations": attestations}
 
 
@@ -131,7 +135,7 @@ def parse_journal_absences(html: str, student_name: str, subject: str) -> dict |
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", class_="p-datatable-table")
     if not table:
-        print(f"[WARN] {subject}: таблица не найдена")
+        log.warning("%s: таблица не найдена", subject)
         return None
 
     rows = table.find_all("tr")
@@ -149,7 +153,7 @@ def parse_journal_absences(html: str, student_name: str, subject: str) -> dict |
             break
 
     if not student_cells:
-        print(f"[WARN] {subject}: строка '{student_name}' не найдена")
+        log.warning("%s: строка '%s' не найдена", subject, student_name)
         return None
 
     absences = []
@@ -170,7 +174,7 @@ def parse_journal_absences(html: str, student_name: str, subject: str) -> dict |
         elif any(c in div_cls for c in ("attendance-by-prepod-absent", "attendance-by-dekanat-sick")):
             absences.append(col)
 
-    print(f"[INFO] {subject}: присутствий {len(present)}, пропусков {len(absences)}")
+    log.info("%s: присутствий %d, пропусков %d", subject, len(present), len(absences))
     return {"absences": absences, "present_count": len(present), "absent_count": len(absences)}
 
 
@@ -180,11 +184,11 @@ async def collect_journal_absences(page, student_name: str = "") -> dict:
     try:
         await page.wait_for_selector("tbody tr", timeout=15000)
     except Exception:
-        print("[WARN] Таблица журналов не появилась")
+        log.warning("Таблица журналов не появилась")
         return {}
 
     rows_count = await page.locator("tbody tr").count()
-    print(f"[INFO] Журналов в таблице: {rows_count}")
+    log.info("Журналов в таблице: %d", rows_count)
 
     absences_by_subject = {}
     for i in range(rows_count):
@@ -205,7 +209,7 @@ async def collect_journal_absences(page, student_name: str = "") -> dict:
             if result:
                 absences_by_subject[subject] = result
         except Exception as e:
-            print(f"[WARN] {subject}: {e}")
+            log.warning("%s: %s", subject, e)
             await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=30000)
             continue
 
@@ -248,7 +252,7 @@ async def async_main():
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
     subjects_ok = len(main_data["attestations"])
     absences_ok = len(absences)
-    print(f"[DONE] Аттестации: {subjects_ok} предметов, пропуски: {absences_ok} журналов → {STATE_FILE}")
+    log.info("Аттестации: %d предметов, пропуски: %d журналов → %s", subjects_ok, absences_ok, STATE_FILE)
 
 
 async def _async_run_for_user(portal_login: str, portal_pass: str, student_name: str) -> dict:
