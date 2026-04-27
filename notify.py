@@ -104,34 +104,34 @@ def build_diff_message(old: dict, new: dict) -> str | None:
     return "\n".join(lines).strip()
 
 
-# ─── Отправщики ──────────────────────────────────────────────────────────────
+# ─── Отправщик (используется GitHub Actions) ─────────────────────────────────
 
-def _tg_send(chat_id: str, text: str, label: str):
+PENDING_FILE = Path(__file__).parent / "pending_notification.json"
+
+
+def tg_send(chat_id: str, text: str, label: str):
+    """Прямая отправка — только для GitHub Actions где Telegram доступен."""
+    import urllib.request, urllib.parse
     token = os.environ.get("TG_TOKEN", "")
     if not token or not chat_id:
-        print(f"[NOTIFY] {label}: токен или chat_id не заданы, пропускаю")
+        print(f"[TG] {label}: токен или chat_id не заданы")
         return
-    import urllib.request, urllib.parse
     url  = f"https://api.telegram.org/bot{token}/sendMessage"
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
-    req  = urllib.request.Request(url, data=data)
     try:
-        resp   = urllib.request.urlopen(req, timeout=15)
+        resp   = urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=15)
         result = json.loads(resp.read())
-        if result.get("ok"):
-            print(f"[NOTIFY] {label}: отправлено")
-        else:
-            print(f"[NOTIFY] {label}: ошибка API — {result}")
+        print(f"[TG] {label}: {'отправлено' if result.get('ok') else result}")
     except Exception as e:
-        print(f"[NOTIFY] {label}: сетевая ошибка — {e}")
+        print(f"[TG] {label}: ошибка — {e}")
 
 
-def send_telegram(text: str):
-    _tg_send(os.environ.get("TG_CHANNEL", ""), text, "Telegram канал")
-
-
-def send_telegram_dm(text: str):
-    _tg_send(os.environ.get("TG_OWNER_ID", ""), text, "Telegram DM")
+def save_pending(channel_msg: str | None, dm_msg: str | None):
+    """Сохраняет сообщения для отправки через GitHub Actions."""
+    payload = {"channel": channel_msg, "dm": dm_msg}
+    PENDING_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    has = [k for k, v in payload.items() if v]
+    print(f"[NOTIFY] Записано в {PENDING_FILE.name}: {has if has else 'пусто'}")
 
 
 # ─── Журналы ─────────────────────────────────────────────────────────────────
@@ -193,26 +193,26 @@ def main():
     print(f"[NOTIFY] Старое расписание: {len(old)} событий")
     print(f"[NOTIFY] Новое расписание: {len(new)} событий")
 
-    msg = build_diff_message(old, new)
-    if not msg:
+    channel_msg = build_diff_message(old, new)
+    if not channel_msg:
         print("[NOTIFY] Расписание не изменилось")
     else:
-        print("[NOTIFY] Найдены изменения в расписании, отправляю в канал...")
-        send_telegram(msg)
+        print("[NOTIFY] Найдены изменения в расписании")
 
-    # Журналы (опционально)
+    dm_msg = None
     if len(sys.argv) >= 5:
         old_j = load_journal_state(sys.argv[3])
         new_j = load_journal_state(sys.argv[4])
         if not old_j.get("attestations"):
             print("[NOTIFY] Журналы: первый запуск, сохраняю baseline без уведомлений")
         else:
-            jmsg = build_journal_diff_message(old_j, new_j)
-            if not jmsg:
+            dm_msg = build_journal_diff_message(old_j, new_j)
+            if not dm_msg:
                 print("[NOTIFY] Журналы не изменились")
             else:
-                print("[NOTIFY] Найдены изменения в журналах, отправляю в личку...")
-                send_telegram_dm(jmsg)
+                print("[NOTIFY] Найдены изменения в журналах")
+
+    save_pending(channel_msg, dm_msg)
 
 
 if __name__ == "__main__":

@@ -39,14 +39,7 @@ jobs:
           PORTAL_PASS:  ${{ secrets.PORTAL_PASS }}
         run: python parse_journals.py
 
-      - name: Check network
-        run: curl -s --max-time 5 https://api.telegram.org || echo "api.telegram.org недоступен с runner'а"
-
-      - name: Send notifications
-        env:
-          TG_TOKEN:    ${{ secrets.TG_TOKEN }}
-          TG_CHANNEL:  ${{ secrets.TG_CHANNEL }}
-          TG_OWNER_ID: ${{ secrets.TG_OWNER_ID }}
+      - name: Prepare notifications
         run: python notify.py old_schedule.ics schedule.ics old_journals_state.json journals_state.json
 
       - name: Sync to Яндекс.Календарь
@@ -59,8 +52,9 @@ jobs:
         run: |
           git config user.name  "gitverse-actions"
           git config user.email "actions@gitverse.ru"
-          git diff --quiet schedule.ics journals_state.json && echo "Без изменений" || (
-            git add schedule.ics journals_state.json &&
+          git diff --quiet schedule.ics journals_state.json pending_notification.json && echo "Без изменений" || (
+            git add schedule.ics journals_state.json pending_notification.json &&
             git commit -m "chore: update schedule $(date +'%Y-%m-%d')" &&
-            git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main
+            git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main &&
+            git push https://volobanov545:${{ secrets.GH_TOKEN }}@github.com/volobanov545/spbgasu-schedule.git main
           )

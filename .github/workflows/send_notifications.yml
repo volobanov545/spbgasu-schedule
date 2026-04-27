@@ -1,0 +1,41 @@
+name: Send Telegram Notifications
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - pending_notification.json
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send to Telegram
+        env:
+          TG_TOKEN:    ${{ secrets.TG_TOKEN }}
+          TG_CHANNEL:  ${{ secrets.TG_CHANNEL }}
+          TG_OWNER_ID: ${{ secrets.TG_OWNER_ID }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request, urllib.parse
+
+          data = json.loads(open("pending_notification.json", encoding="utf-8").read())
+          token = os.environ["TG_TOKEN"]
+
+          def send(chat_id, text, label):
+              if not text or not chat_id:
+                  return
+              url  = f"https://api.telegram.org/bot{token}/sendMessage"
+              body = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+              try:
+                  resp   = urllib.request.urlopen(urllib.request.Request(url, body), timeout=15)
+                  result = json.loads(resp.read())
+                  print(f"{label}: {'OK' if result.get('ok') else result}")
+              except Exception as e:
+                  print(f"{label}: ошибка — {e}")
+
+          send(os.environ.get("TG_CHANNEL", ""),  data.get("channel"), "Канал")
+          send(os.environ.get("TG_OWNER_ID", ""), data.get("dm"),      "DM")
+          EOF
