@@ -60,8 +60,9 @@ BTN_DELETE = "❌ Удалить аккаунт"
 KB_BTNS = {BTN_STATS, BTN_YC, BTN_USERS, BTN_DELETE}
 
 
-def reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
-    rows = [[KeyboardButton(BTN_STATS), KeyboardButton(BTN_YC)]]
+def reply_keyboard(is_owner: bool = False, has_yc: bool = False) -> ReplyKeyboardMarkup:
+    top = [KeyboardButton(BTN_STATS)] if has_yc else [KeyboardButton(BTN_STATS), KeyboardButton(BTN_YC)]
+    rows = [top]
     if is_owner:
         rows.append([KeyboardButton(BTN_USERS)])
     rows.append([KeyboardButton(BTN_DELETE)])
@@ -96,7 +97,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"Привет! Ты зарегистрирован (логин: {user['login']}).\n"
             f"Яндекс.Календарь: {yc}",
-            reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID),
+            reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID, has_yc=bool(user["yandex_login"])),
         )
         return ConversationHandler.END
     await update.message.reply_text(
@@ -238,7 +239,10 @@ async def got_yc2_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return WAIT_YC2_LOGIN
     ctx.user_data.pop("yc_login", None)
     set_yandex(update.effective_user.id, yc_login, yc_pass)
-    await update.message.reply_text("✅ Яндекс.Календарь подключён!", reply_markup=main_menu())
+    await update.message.reply_text(
+        "✅ Яндекс.Календарь подключён!",
+        reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID, has_yc=True),
+    )
     return ConversationHandler.END
 
 
@@ -282,11 +286,10 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             from sync_yandex import sync_calendar
             from pathlib import Path
             ics = Path(__file__).parent / "schedule.ics"
-            synced = await asyncio.to_thread(sync_calendar, user["yandex_login"], user["yandex_pass"], ics)
-            await send(f"📅 Яндекс.Календарь обновлён ({synced} событий).")
+            await asyncio.to_thread(sync_calendar, user["yandex_login"], user["yandex_pass"], ics)
         except Exception as e:
             log.warning("yandex sync error: %s", e)
-            await send(f"⚠️ Яндекс.Календарь: ошибка авторизации.\nПроверь пароль приложения — нажми «📅 Яндекс.Календарь» и введи заново.")
+            await send("⚠️ Яндекс.Календарь: ошибка авторизации.\nПроверь пароль приложения — нажми «📅 Яндекс.Календарь» и введи заново.")
 
 
 def _format_stats(data: dict) -> str:
@@ -406,10 +409,11 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         approve_user(tid)
         await query.edit_message_text(query.message.text + "\n\n✅ Одобрено")
         try:
+            approved_user = get_user(tid)
             await ctx.bot.send_message(
                 chat_id=tid,
                 text="✅ Твоя заявка одобрена! Можешь пользоваться ботом.",
-                reply_markup=reply_keyboard(tid == OWNER_ID),
+                reply_markup=reply_keyboard(tid == OWNER_ID, has_yc=bool(approved_user and approved_user.get("yandex_login"))),
             )
         except Exception:
             pass
