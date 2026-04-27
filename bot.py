@@ -348,6 +348,16 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if query.from_user.id != OWNER_ID:
         return
 
+    if data.startswith("owner_remove:"):
+        tid = int(data.split(":")[1])
+        remove_user(tid)
+        await query.edit_message_text(query.message.text + "\n\n🗑 Удалён")
+        try:
+            await ctx.bot.send_message(chat_id=tid, text="Твой аккаунт удалён администратором.")
+        except Exception:
+            pass
+        return
+
     if data.startswith("approve:"):
         tid = int(data.split(":")[1])
         approve_user(tid)
@@ -434,17 +444,25 @@ async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not users:
         await update.message.reply_text("Нет пользователей.")
         return
-    lines = [f"👥 Пользователи ({len(users)}):"]
+    await update.message.reply_text(f"👥 Пользователей: {len(users)}")
     for u in users:
+        tid = u["telegram_id"]
         if u.get("banned"):
-            status = "🚫"
+            status = "🚫 Заблокирован"
+            toggle_btn = InlineKeyboardButton("✅ Разбанить", callback_data=f"unban:{tid}")
         elif u["approved"]:
-            status = "✅"
+            status = "✅ Активен"
+            toggle_btn = InlineKeyboardButton("🚫 Заблокировать", callback_data=f"ban:{tid}")
         else:
-            status = "⏳"
-        yc = " 📅" if u["yandex_login"] else ""
-        lines.append(f"  {status}{yc} {u['telegram_id']} — {u['login']}")
-    await update.message.reply_text("\n".join(lines))
+            status = "⏳ Ожидает подтверждения"
+            toggle_btn = InlineKeyboardButton("✅ Одобрить", callback_data=f"approve:{tid}")
+        yc = "📅 Яндекс подключён" if u["yandex_login"] else "без Яндекса"
+        text = f"{status}\nID: {tid} | Портал: {u['login']}\n{yc}"
+        kb = InlineKeyboardMarkup([[
+            toggle_btn,
+            InlineKeyboardButton("🗑 Удалить", callback_data=f"owner_remove:{tid}"),
+        ]])
+        await update.message.reply_text(text, reply_markup=kb)
 
 
 async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
