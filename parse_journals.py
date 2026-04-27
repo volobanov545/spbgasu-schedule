@@ -100,8 +100,11 @@ def parse_main_page(html: str) -> dict:
 
     # Таблица аттестаций
     attestations = {}
-    for table in soup.find_all("table"):
+    all_tables = soup.find_all("table")
+    print(f"[DEBUG] Таблиц на странице: {len(all_tables)}")
+    for table in all_tables:
         headers = [th.get_text(strip=True) for th in table.find_all("th")]
+        print(f"[DEBUG] Заголовки таблицы: {headers[:6]}")
         if "1-я атт." not in headers and "2-я атт." not in " ".join(headers):
             continue
         for row in table.find_all("tr")[1:]:
