@@ -102,10 +102,9 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text("⏳ Загружаю данные с портала, подожди ~30 сек...")
     try:
+        import asyncio
         from parse_journals import parse_lk_main
-        data = await ctx.application.loop.run_in_executor(
-            None, parse_lk_main, user["login"], user["password"]
-        )
+        data = await asyncio.to_thread(parse_lk_main, user["login"], user["password"])
         text = _format_stats(data)
     except Exception as e:
         log.exception("stats error for %s", user["login"])

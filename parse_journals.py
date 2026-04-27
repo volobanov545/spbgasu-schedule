@@ -20,20 +20,22 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 PORTAL_URL   = "https://portal.spbgasu.ru"
-PORTAL_LOGIN = os.environ["PORTAL_LOGIN"]
-PORTAL_PASS  = os.environ["PORTAL_PASS"]
+PORTAL_LOGIN = os.environ.get("PORTAL_LOGIN", "")
+PORTAL_PASS  = os.environ.get("PORTAL_PASS", "")
 STUDENT_NAME = os.environ.get("STUDENT_NAME", "Лобанов")
 STATE_FILE   = Path(__file__).parent / "journals_state.json"
 
 
 # ─── Playwright ───────────────────────────────────────────────────────────────
 
-async def login(page):
+async def login(page, login: str = "", password: str = ""):
+    _login = login or PORTAL_LOGIN
+    _pass  = password or PORTAL_PASS
     page.set_default_timeout(60000)
     await page.goto(f"{PORTAL_URL}/auth/", wait_until="domcontentloaded", timeout=90000)
     await page.wait_for_selector("input[name='USER_LOGIN']", state="visible", timeout=30000)
-    await page.locator("input[name='USER_LOGIN']").press_sequentially(PORTAL_LOGIN, delay=50)
-    await page.locator("input[name='USER_PASSWORD']").press_sequentially(PORTAL_PASS, delay=50)
+    await page.locator("input[name='USER_LOGIN']").press_sequentially(_login, delay=50)
+    await page.locator("input[name='USER_PASSWORD']").press_sequentially(_pass, delay=50)
     async with page.expect_navigation(timeout=60000):
         await page.evaluate("document.querySelector('form').submit()")
     await page.wait_for_timeout(2000)
@@ -130,7 +132,7 @@ def parse_journal_absences(html: str, student_name: str, subject: str) -> dict |
     return {"absences": absences, "present_count": len(present), "absent_count": len(absences)}
 
 
-async def collect_journal_absences(page) -> dict:
+async def collect_journal_absences(page, student_name: str = "") -> dict:
     """Кликает по каждому журналу и парсит пропуски."""
     await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=60000)
     try:
@@ -157,7 +159,7 @@ async def collect_journal_absences(page) -> dict:
             await page.wait_for_selector("table.p-datatable-table", timeout=15000)
             await page.wait_for_timeout(1500)
             html   = await page.content()
-            result = parse_journal_absences(html, STUDENT_NAME, subject)
+            result = parse_journal_absences(html, student_name or STUDENT_NAME, subject)
             if result:
                 absences_by_subject[subject] = result
         except Exception as e:
@@ -182,7 +184,7 @@ async def async_main():
         browser = await pw.chromium.launch(headless=True)
         page    = await browser.new_page()
 
-        await login(page)
+        await login(page, PORTAL_LOGIN, PORTAL_PASS)
 
         # Главная страница — аттестации и сводка
         await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
@@ -205,6 +207,27 @@ async def async_main():
     subjects_ok = len(main_data["attestations"])
     absences_ok = len(absences)
     print(f"[DONE] Аттестации: {subjects_ok} предметов, пропуски: {absences_ok} журналов → {STATE_FILE}")
+
+
+async def _async_run_for_user(login: str, password: str, student_name: str) -> dict:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        page    = await browser.new_page()
+        await login(page, login, password)
+        await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
+        await page.wait_for_timeout(2000)
+        main_data = parse_main_page(await page.content())
+        absences  = await collect_journal_absences(page, student_name)
+        await browser.close()
+    return {
+        "stats":        main_data["stats"],
+        "attestations": main_data["attestations"],
+        "absences":     absences,
+    }
+
+
+def parse_lk_main(portal_login: str, portal_pass: str, student_name: str = "") -> dict:
+    return asyncio.run(_async_run_for_user(portal_login, portal_pass, student_name or "Лобанов"))
 
 
 def main():
