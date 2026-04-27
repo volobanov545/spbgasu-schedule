@@ -46,9 +46,14 @@ def _save_debug_html(html: str, filename: str):
 
 # ─── Playwright ───────────────────────────────────────────────────────────────
 
+def _safe_login(login: str) -> str:
+    """Только безопасные символы для имени файла — убирает path traversal."""
+    return re.sub(r'[^a-zA-Z0-9_-]', '_', login) or "unknown"
+
+
 def _session_file(portal_login: str) -> Path:
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
-    return SESSION_DIR / f"{portal_login}.json"
+    return SESSION_DIR / f"{_safe_login(portal_login)}.json"
 
 
 async def login_with_session(context, portal_login: str, portal_pass: str):
@@ -310,7 +315,7 @@ async def _async_run_for_user(portal_login: str, portal_pass: str, student_name:
             log.warning("Таблица не заполнилась за 12 сек — берём что есть")
         await page.wait_for_timeout(500)
         html = await page.content()
-        _save_debug_html(html, f"debug_lk_{portal_login}.html")
+        _save_debug_html(html, f"debug_lk_{_safe_login(portal_login)}.html")
         main_data = parse_main_page(html)
         absences  = await collect_journal_absences(page, student_name)
 
@@ -350,8 +355,8 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
                 log.warning("Таблица не заполнилась за 12 сек — берём что есть")
             await page.wait_for_timeout(500)
             html = await page.content()
-            _save_debug_html(html, f"debug_lk_{portal_login}.html")
-            await page.screenshot(path=str(DATA_DIR / f"debug_lk_{portal_login}.png"), full_page=True)
+            _save_debug_html(html, f"debug_lk_{_safe_login(portal_login)}.html")
+            await page.screenshot(path=str(DATA_DIR / f"debug_lk_{_safe_login(portal_login)}.png"), full_page=True)
             log.info("Скриншот сохранён: debug_lk_%s.png", portal_login)
             main_data = parse_main_page(html)
             await browser.close()

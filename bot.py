@@ -29,6 +29,7 @@ Telegram-бот GASUCHKA (@gasu4ka_bot).
 """
 
 import asyncio
+import html as html_mod
 import logging
 import os
 import re
@@ -237,7 +238,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         yc = "✅ подключён" if user["yandex_login"] else "не подключён"
         await update.message.reply_text(
             "🎓 <b>GASUCHKA</b>\n\n"
-            f"👤 <code>{user['login']}</code>\n"
+            f"👤 <code>{html_mod.escape(user['login'])}</code>\n"
             f"📅 Яндекс.Календарь: {yc}",
             parse_mode="HTML",
             reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID),
@@ -277,7 +278,11 @@ async def _start_register(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def got_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Сохраняем логин в ctx.user_data (временное хранилище на время диалога)."""
-    ctx.user_data["login"] = update.message.text.strip()
+    login = update.message.text.strip()
+    if not login or len(login) > 50:
+        await update.message.reply_text("❌ Логин должен быть от 1 до 50 символов. Попробуй ещё раз:")
+        return WAIT_LOGIN
+    ctx.user_data["login"] = login
     await update.message.reply_text(
         "📝 <b>Регистрация — шаг 2 из 3</b>\n\n"
         "Введи пароль от портала:",
@@ -292,11 +297,15 @@ async def got_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     one_time_keyboard=True — клавиатура исчезает сразу после нажатия.
     Кнопки «✅ Да» / «❌ Нет» избавляют от необходимости что-то печатать.
     """
-    ctx.user_data["password"] = update.message.text.strip()
+    password = update.message.text.strip()
     try:
         await update.message.delete()
     except Exception:
         pass  # нет прав на удаление — не критично
+    if not password or len(password) > 256:
+        await update.message.reply_text("❌ Пароль должен быть от 1 до 256 символов. Попробуй ещё раз:")
+        return WAIT_PASSWORD
+    ctx.user_data["password"] = password
     await update.message.reply_text(
         "📝 <b>Регистрация — шаг 3 из 3</b>\n\n"
         "Хочешь подключить Яндекс.Календарь?\n"
@@ -321,7 +330,11 @@ async def got_yc_choice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    ctx.user_data["yc_login"] = update.message.text.strip()
+    yc_login = update.message.text.strip()
+    if not yc_login or len(yc_login) > 64:
+        await update.message.reply_text("❌ Логин Яндекса должен быть до 64 символов. Попробуй ещё раз:")
+        return WAIT_YC_LOGIN
+    ctx.user_data["yc_login"] = yc_login
     await update.message.reply_text("Теперь введи пароль приложения (16 символов):")
     return WAIT_YC_PASS
 
@@ -440,7 +453,11 @@ async def cmd_connect_yandex(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc2_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    ctx.user_data["yc_login"] = update.message.text.strip()
+    yc_login = update.message.text.strip()
+    if not yc_login or len(yc_login) > 64:
+        await update.message.reply_text("❌ Логин Яндекса должен быть до 64 символов. Попробуй ещё раз:")
+        return WAIT_YC2_LOGIN
+    ctx.user_data["yc_login"] = yc_login
     await update.message.reply_text("Теперь введи пароль приложения:")
     return WAIT_YC2_PASS
 
@@ -814,6 +831,14 @@ async def cmd_unregister(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
 
+def _tid_from_data(data: str) -> int | None:
+    """Извлекает telegram_id из строки вида 'action:TID'. Возвращает None при ошибке."""
+    try:
+        return int(data.split(":")[1])
+    except (IndexError, ValueError):
+        return None
+
+
 # ─── Глобальный обработчик inline-кнопок ─────────────────────────────────────
 
 async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -914,7 +939,9 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         Так же как и при самоудалении — сначала удаляем ЯК, потом из БД.
         try/except вокруг send_message — пользователь мог заблокировать бота.
         """
-        tid  = int(data.split(":")[1])
+        tid = _tid_from_data(data)
+        if tid is None:
+            return
         user = get_user(tid)
         if user and user.get("yandex_login") and user.get("yandex_pass"):
             try:
@@ -933,7 +960,9 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("approve:"):
-        tid = int(data.split(":")[1])
+        tid = _tid_from_data(data)
+        if tid is None:
+            return
         approve_user(tid)
         await query.edit_message_text(query.message.text + "\n\n✅ Одобрено")
         try:
@@ -946,7 +975,9 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             pass
 
     elif data.startswith("deny:"):
-        tid = int(data.split(":")[1])
+        tid = _tid_from_data(data)
+        if tid is None:
+            return
         remove_user(tid)
         await query.edit_message_text(query.message.text + "\n\n❌ Отклонено и удалено")
         try:
@@ -955,7 +986,9 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             pass
 
     elif data.startswith("ban:"):
-        tid = int(data.split(":")[1])
+        tid = _tid_from_data(data)
+        if tid is None:
+            return
         ban_user(tid)
         await query.edit_message_text(query.message.text + "\n\n🚫 Заблокирован")
         try:
@@ -964,7 +997,9 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             pass
 
     elif data.startswith("unban:"):
-        tid = int(data.split(":")[1])
+        tid = _tid_from_data(data)
+        if tid is None:
+            return
         unban_user(tid)
         await query.edit_message_text(query.message.text + "\n\n✅ Разблокирован")
 
@@ -974,7 +1009,11 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_approve(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
-    tid = int(ctx.args[0])
+    try:
+        tid = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Укажи числовой ID.")
+        return
     approve_user(tid)
     await update.message.reply_text(f"✅ {tid} одобрен.")
     try:
@@ -986,7 +1025,11 @@ async def cmd_approve(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_deny(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
-    tid = int(ctx.args[0])
+    try:
+        tid = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Укажи числовой ID.")
+        return
     remove_user(tid)
     await update.message.reply_text(f"❌ {tid} отклонён.")
     try:
@@ -998,7 +1041,11 @@ async def cmd_deny(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_ban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
-    tid = int(ctx.args[0])
+    try:
+        tid = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Укажи числовой ID.")
+        return
     ban_user(tid)
     await update.message.reply_text(f"🚫 {tid} заблокирован.")
     try:
@@ -1010,7 +1057,11 @@ async def cmd_ban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
-    tid = int(ctx.args[0])
+    try:
+        tid = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Укажи числовой ID.")
+        return
     unban_user(tid)
     await update.message.reply_text(f"✅ {tid} разблокирован.")
 
@@ -1054,7 +1105,12 @@ async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Текстовая команда удаления — дублирует кнопку «🗑 Удалить» в /users."""
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
-    remove_user(int(ctx.args[0]))
+    try:
+        tid = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Укажи числовой ID.")
+        return
+    remove_user(tid)
     await update.message.reply_text("✅ Удалён.")
 
 
