@@ -143,24 +143,32 @@ def load_journal_state(path: str) -> dict:
 def build_journal_diff_message(old: dict, new: dict) -> str | None:
     lines = []
 
-    for subject, new_data in new.items():
-        old_data = old.get(subject, {})
+    # Изменения в аттестациях (из главной страницы)
+    old_att = old.get("attestations", {})
+    new_att = new.get("attestations", {})
+    for subject, new_marks in new_att.items():
+        old_marks = old_att.get(subject, {})
+        for key, label in [("att1", "1-я атт."), ("att2", "2-я атт.")]:
+            n = new_marks.get(key, "—")
+            o = old_marks.get(key, "—")
+            if n != o and n not in ("—", ""):
+                lines.append(f"📋 Аттестация — {subject}\n   {label}: {o} → {n}")
 
-        # Новые пропуски
-        old_absences = set(old_data.get("absences", []))
-        new_absences = set(new_data.get("absences", []))
-        added_absences = new_absences - old_absences
-        if added_absences:
-            dates = ", ".join(sorted(added_absences))
+    # Изменения в пропусках (из индивидуальных журналов)
+    old_abs = old.get("absences", {})
+    new_abs = new.get("absences", {})
+    for subject, new_data in new_abs.items():
+        old_data = old_abs.get(subject, {})
+        added = set(new_data.get("absences", [])) - set(old_data.get("absences", []))
+        if added:
+            dates = ", ".join(sorted(added))
             lines.append(f"❌ Новый пропуск — {subject}\n   {dates}")
 
-        # Изменения в аттестациях
-        old_att = old_data.get("attestations", {})
-        new_att = new_data.get("attestations", {})
-        for col, val in new_att.items():
-            if val and val != old_att.get(col):
-                prev = old_att.get(col, "—")
-                lines.append(f"📋 Аттестация — {subject}\n   {col}: {prev} → {val}")
+    # Изменение % отсутствий
+    old_pct = old.get("stats", {}).get("absent_pct")
+    new_pct = new.get("stats", {}).get("absent_pct")
+    if old_pct is not None and new_pct is not None and new_pct > old_pct + 1:
+        lines.append(f"📊 Процент отсутствий вырос: {old_pct}% → {new_pct}%")
 
     if not lines:
         return None

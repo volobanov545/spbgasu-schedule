@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 Парсер журналов посещаемости и аттестаций СПбГАСУ.
+Забирает аттестации и статистику с главной страницы ЛК,
+затем ходит по журналам для точных данных о пропусках.
 Переменные окружения:
   PORTAL_LOGIN  — логин от портала
   PORTAL_PASS   — пароль от портала
@@ -24,101 +26,81 @@ STUDENT_NAME = os.environ.get("STUDENT_NAME", "Лобанов")
 STATE_FILE   = Path(__file__).parent / "journals_state.json"
 
 
+# ─── Playwright ───────────────────────────────────────────────────────────────
+
 async def login(page):
     page.set_default_timeout(60000)
     await page.goto(f"{PORTAL_URL}/auth/", wait_until="domcontentloaded", timeout=90000)
-
-    login_sel = "input[name='USER_LOGIN'], input[name='login'], input[placeholder='Логин']"
-    pass_sel  = "input[name='USER_PASSWORD'], input[name='password'], input[placeholder='Пароль']"
-
-    await page.wait_for_selector(login_sel, state="visible", timeout=30000)
-    await page.locator(login_sel).press_sequentially(PORTAL_LOGIN, delay=50)
-    await page.locator(pass_sel).press_sequentially(PORTAL_PASS, delay=50)
-
+    await page.wait_for_selector("input[name='USER_LOGIN']", state="visible", timeout=30000)
+    await page.locator("input[name='USER_LOGIN']").press_sequentially(PORTAL_LOGIN, delay=50)
+    await page.locator("input[name='USER_PASSWORD']").press_sequentially(PORTAL_PASS, delay=50)
     async with page.expect_navigation(timeout=60000):
         await page.evaluate("document.querySelector('form').submit()")
     await page.wait_for_timeout(2000)
     print("[INFO] Авторизация успешна")
 
 
-async def get_journal_urls(page) -> list[tuple[str, str]]:
-    """Кликает каждую строку в таблице журналов и собирает (предмет, url)."""
-    await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=60000)
+# ─── Главная страница: аттестации и сводка посещаемости ──────────────────────
 
-    # Ждём появления строк таблицы
-    try:
-        await page.wait_for_selector("tbody tr", timeout=15000)
-    except Exception:
-        print("[WARN] Таблица журналов не появилась")
-        return []
-
-    rows_count = await page.locator("tbody tr").count()
-    print(f"[INFO] Строк в таблице журналов: {rows_count}")
-
-    results = []
-    for i in range(rows_count):
-        # Перечитываем строку каждый раз (DOM обновляется после навигации)
-        row = page.locator("tbody tr").nth(i)
-
-        # Берём название предмета из второй ячейки
-        cells = row.locator("td")
-        count = await cells.count()
-        if count < 2:
-            continue
-        subject = (await cells.nth(1).inner_text()).strip()
-        if not subject:
-            continue
-
-        # Кликаем строку и ждём навигации
-        try:
-            async with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
-                await row.click()
-            await page.wait_for_timeout(1500)
-            url = page.url
-            print(f"[INFO] Журнал: {subject} → {url}")
-            results.append((subject, url))
-        except Exception as e:
-            print(f"[WARN] Не удалось открыть журнал '{subject}': {e}")
-            await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=30000)
-            continue
-
-        # Возвращаемся к списку
-        await page.go_back(wait_until="networkidle", timeout=30000)
-        try:
-            await page.wait_for_selector("tbody tr", timeout=10000)
-        except Exception:
-            await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=30000)
-            await page.wait_for_selector("tbody tr", timeout=10000)
-
-    return results
-
-
-def parse_journal_html(html: str, student_name: str, subject: str) -> dict | None:
+def parse_main_page(html: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
 
-    # Ищем таблицу содержащую имя студента
-    table = None
-    for t in soup.find_all("table"):
-        if t.find(string=re.compile(student_name, re.IGNORECASE)):
-            table = t
-            break
+    # Сводка посещаемости — 4 числа в блоке grid-cols-12
+    stats = {}
+    for div in soup.find_all("div", class_=re.compile(r"grid-cols-12")):
+        text = div.get_text(" ", strip=True)
+        m = re.search(r"(\d+)\s*Проведено занятий", text)
+        if m:
+            stats["total_classes"] = int(m.group(1))
+        for label, key in [
+            ("Процент присутствий", "present_pct"),
+            ("Процент отсутствий", "absent_pct"),
+            ("Процент неотмеченных", "unmarked_pct"),
+        ]:
+            m = re.search(r"([\d.]+)%\s*" + label, text)
+            if m:
+                stats[key] = float(m.group(1))
 
+    # Таблица аттестаций
+    attestations = {}
+    for table in soup.find_all("table"):
+        headers = [th.get_text(strip=True) for th in table.find_all("th")]
+        if "1-я атт." not in headers and "2-я атт." not in " ".join(headers):
+            continue
+        for row in table.find_all("tr")[1:]:
+            cells = row.find_all("td")
+            if len(cells) < 4:
+                continue
+            subject = cells[1].get_text(strip=True)
+            att1    = cells[2].get_text(strip=True)
+            att2    = cells[3].get_text(strip=True)
+            if subject:
+                attestations[subject] = {"att1": att1, "att2": att2}
+
+    print(f"[INFO] Главная: {len(attestations)} предметов, посещаемость {stats.get('present_pct', '?')}%")
+    return {"stats": stats, "attestations": attestations}
+
+
+# ─── Индивидуальные журналы: пропуски ────────────────────────────────────────
+
+def parse_journal_absences(html: str, student_name: str, subject: str) -> dict | None:
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table", class_="p-datatable-table")
     if not table:
-        print(f"[WARN] {subject}: таблица с '{student_name}' не найдена")
+        print(f"[WARN] {subject}: таблица не найдена")
         return None
 
     rows = table.find_all("tr")
-    if len(rows) < 2:
-        return None
 
-    # Заголовок — даты/названия колонок
-    headers = [th.get_text(strip=True) for th in rows[0].find_all(["th", "td"])]
+    # Строка 1 — заголовки с датами
+    header_cells = rows[1].find_all(["th", "td"]) if len(rows) > 1 else []
+    headers = [c.get_text(strip=True) for c in header_cells]
 
     # Строка студента
     student_cells = None
-    for tr in rows[1:]:
-        cells = tr.find_all(["td", "th"])
-        if cells and re.search(student_name, cells[0].get_text(strip=True), re.IGNORECASE):
+    for row in rows[2:]:
+        cells = row.find_all("td")
+        if len(cells) > 1 and re.search(student_name, cells[1].get_text(strip=True), re.IGNORECASE):
             student_cells = cells
             break
 
@@ -126,33 +108,74 @@ def parse_journal_html(html: str, student_name: str, subject: str) -> dict | Non
         print(f"[WARN] {subject}: строка '{student_name}' не найдена")
         return None
 
-    attendance   = {}
-    attestations = {}
+    absences = []
+    present  = []
 
-    for i, cell in enumerate(student_cells[1:], start=1):
-        col_name = headers[i] if i < len(headers) else str(i)
-        text     = cell.get_text(strip=True)
-        classes  = " ".join(cell.get("class", []))
+    for i, cell in enumerate(student_cells[2:], start=2):
+        col = headers[i] if i < len(headers) else str(i)
+        if "attestation-bg" in " ".join(cell.get("class", [])):
+            continue  # аттестации берём с главной страницы
 
-        if re.search(r"аттест", col_name, re.IGNORECASE) or "attest" in classes.lower():
-            attestations[col_name] = text
-        else:
-            attendance[col_name] = text
+        div = cell.find("div", class_="attendance-content")
+        if not div:
+            continue
+        div_cls = " ".join(div.get("class", []))
 
-    absences = [d for d, v in attendance.items() if v.lower() in ("н", "н/б", "-")]
-    present  = [d for d, v in attendance.items() if v in ("✓", "+", "1", "б", "п")]
+        if any(c in div_cls for c in ("attendance-by-prepod-present", "attendance-by-student")):
+            present.append(col)
+        elif any(c in div_cls for c in ("attendance-by-prepod-absent", "attendance-by-dekanat-sick")):
+            absences.append(col)
 
-    print(f"[INFO]   присутствий: {len(present)}, пропусков: {len(absences)}, аттестаций: {len(attestations)}")
+    print(f"[INFO] {subject}: присутствий {len(present)}, пропусков {len(absences)}")
+    return {"absences": absences, "present_count": len(present), "absent_count": len(absences)}
 
-    return {
-        "subject":       subject,
-        "attendance":    attendance,
-        "attestations":  attestations,
-        "absences":      absences,
-        "present_count": len(present),
-        "absent_count":  len(absences),
-    }
 
+async def collect_journal_absences(page) -> dict:
+    """Кликает по каждому журналу и парсит пропуски."""
+    await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=60000)
+    try:
+        await page.wait_for_selector("tbody tr", timeout=15000)
+    except Exception:
+        print("[WARN] Таблица журналов не появилась")
+        return {}
+
+    rows_count = await page.locator("tbody tr").count()
+    print(f"[INFO] Журналов в таблице: {rows_count}")
+
+    absences_by_subject = {}
+    for i in range(rows_count):
+        row   = page.locator("tbody tr").nth(i)
+        cells = row.locator("td")
+        if await cells.count() < 2:
+            continue
+        subject = (await cells.nth(1).inner_text()).strip()
+
+        try:
+            async with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+                await row.click()
+            # Ждём пока PrimeVue DataTable отрисует данные
+            await page.wait_for_selector("table.p-datatable-table", timeout=15000)
+            await page.wait_for_timeout(1500)
+            html   = await page.content()
+            result = parse_journal_absences(html, STUDENT_NAME, subject)
+            if result:
+                absences_by_subject[subject] = result
+        except Exception as e:
+            print(f"[WARN] {subject}: {e}")
+            await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=30000)
+            continue
+
+        await page.go_back(wait_until="networkidle", timeout=30000)
+        try:
+            await page.wait_for_selector("tbody tr", timeout=10000)
+        except Exception:
+            await page.goto(f"{PORTAL_URL}/lk/journals/", wait_until="networkidle", timeout=30000)
+            await page.wait_for_selector("tbody tr", timeout=10000)
+
+    return absences_by_subject
+
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
 
 async def async_main():
     async with async_playwright() as pw:
@@ -161,32 +184,27 @@ async def async_main():
 
         await login(page)
 
-        journal_urls = await get_journal_urls(page)
-        if not journal_urls:
-            print("[ERROR] Список журналов пуст")
-            await browser.close()
-            sys.exit(1)
+        # Главная страница — аттестации и сводка
+        await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
+        await page.wait_for_timeout(2000)
+        main_data = parse_main_page(await page.content())
 
-        state = {}
-        for subject, url in journal_urls:
-            try:
-                await page.goto(url, wait_until="networkidle", timeout=60000)
-                # Ждём пока таблица с именем студента реально отрисуется
-                try:
-                    await page.wait_for_selector(f"text={STUDENT_NAME}", timeout=15000)
-                except Exception:
-                    print(f"[WARN] {subject}: имя '{STUDENT_NAME}' не появилось на странице")
-                html   = await page.content()
-                result = parse_journal_html(html, STUDENT_NAME, subject)
-                if result:
-                    state[subject] = result
-            except Exception as e:
-                print(f"[WARN] {subject}: ошибка при парсинге — {e}")
+        # Индивидуальные журналы — пропуски
+        absences = await collect_journal_absences(page)
 
         await browser.close()
 
+    # Объединяем в итоговое состояние
+    state = {
+        "stats":        main_data["stats"],
+        "attestations": main_data["attestations"],
+        "absences":     absences,
+    }
+
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[DONE] Сохранено {len(state)} журналов → {STATE_FILE}")
+    subjects_ok = len(main_data["attestations"])
+    absences_ok = len(absences)
+    print(f"[DONE] Аттестации: {subjects_ok} предметов, пропуски: {absences_ok} журналов → {STATE_FILE}")
 
 
 def main():
