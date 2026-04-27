@@ -40,7 +40,8 @@ async def login_with_session(context, portal_login: str, portal_pass: str):
     if sf.exists():
         await context.add_cookies(json.loads(sf.read_text()))
         page = await context.new_page()
-        await page.goto(f"{PORTAL_URL}/lk/", wait_until="domcontentloaded", timeout=30000)
+        await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
+        await page.wait_for_timeout(2000)
         if "/auth/" not in page.url:
             print("[INFO] Сессия восстановлена из кэша")
             return page
