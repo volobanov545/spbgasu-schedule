@@ -327,13 +327,13 @@ def parse_lk_main(portal_login: str, portal_pass: str, student_name: str = "") -
 
 
 async def _async_quick(portal_login: str, portal_pass: str) -> dict:
-    """Только главная /lk/ — без обхода журналов. С кэшем сессии ~10 сек."""
+    """Только главная /lk/ — без обхода журналов. Свежий логин каждый раз."""
     _browser_sem.acquire()
     try:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=True)
-            context = await browser.new_context()
-            page    = await login_with_session(context, portal_login, portal_pass)
+            page    = await browser.new_page()
+            await login(page, portal_login, portal_pass)
             await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
             try:
                 await page.wait_for_selector("table", timeout=8000)
