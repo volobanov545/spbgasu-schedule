@@ -231,6 +231,27 @@ def parse_lk_main(portal_login: str, portal_pass: str, student_name: str = "") -
     return asyncio.run(_async_run_for_user(portal_login, portal_pass, student_name or "Лобанов"))
 
 
+async def _async_quick(portal_login: str, portal_pass: str) -> dict:
+    """Только главная /lk/ — без обхода журналов. ~30 сек вместо 2 мин."""
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        page    = await browser.new_page()
+        await login(page, portal_login, portal_pass)
+        await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
+        await page.wait_for_timeout(2000)
+        main_data = parse_main_page(await page.content())
+        await browser.close()
+    return {
+        "stats":        main_data["stats"],
+        "attestations": main_data["attestations"],
+        "absences":     {},
+    }
+
+
+def parse_lk_quick(portal_login: str, portal_pass: str) -> dict:
+    return asyncio.run(_async_quick(portal_login, portal_pass))
+
+
 def main():
     asyncio.run(async_main())
 

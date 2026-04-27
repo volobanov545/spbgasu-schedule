@@ -175,10 +175,10 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not user["approved"]:
         await update.message.reply_text("⏳ Твоя заявка ещё не подтверждена администратором.")
         return
-    await update.message.reply_text("⏳ Загружаю данные с портала, подожди ~2 мин...")
+    await update.message.reply_text("⏳ Загружаю данные с портала, подожди ~30 сек...")
     try:
-        from parse_journals import parse_lk_main
-        data = await asyncio.to_thread(parse_lk_main, user["login"], user["password"])
+        from parse_journals import parse_lk_quick
+        data = await asyncio.to_thread(parse_lk_quick, user["login"], user["password"])
         text = _format_stats(data)
     except Exception as e:
         log.exception("stats error for %s", user["login"])
