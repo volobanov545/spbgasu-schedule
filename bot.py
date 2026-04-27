@@ -220,6 +220,7 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await send(f"📅 Яндекс.Календарь обновлён ({synced} событий).")
         except Exception as e:
             log.warning("yandex sync error: %s", e)
+            await send(f"⚠️ Яндекс.Календарь: ошибка авторизации.\nПроверь пароль приложения — нажми «📅 Яндекс.Календарь» и введи заново.")
 
 
 def _format_stats(data: dict) -> str:
