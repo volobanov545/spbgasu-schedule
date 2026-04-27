@@ -19,6 +19,7 @@ import caldav
 from db import init_db, add_user, set_yandex, approve_user, ban_user, unban_user, remove_user, get_user, get_all_users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
 TOKEN    = os.environ["TG_TOKEN"]
@@ -68,6 +69,12 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if user:
         if user.get("banned"):
             await update.message.reply_text("🚫 Доступ закрыт.")
+            return ConversationHandler.END
+        if not user["approved"]:
+            await update.message.reply_text(
+                f"⏳ Ты уже зарегистрирован (логин: {user['login']}).\n"
+                "Заявка ещё не подтверждена администратором — ожидай."
+            )
             return ConversationHandler.END
         yc = "подключён ✅" if user["yandex_login"] else "не подключён"
         await update.message.reply_text(
@@ -261,12 +268,26 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 def _format_stats(data: dict) -> str:
-    lines = ["📋 Аттестации:\n"]
-    for subj, marks in data.get("attestations", {}).items():
-        a1 = marks.get("att1", "—")
-        a2 = marks.get("att2", "—")
-        lines.append(f"  {subj}: 1-я {a1} / 2-я {a2}")
-    return "\n".join(lines)
+    lines = []
+
+    stats = data.get("stats", {})
+    if stats:
+        total   = stats.get("total_classes", "?")
+        present = stats.get("present_pct", "?")
+        absent  = stats.get("absent_pct", "?")
+        lines.append(f"📊 Посещаемость: {present}% присутствий, {absent}% пропусков ({total} занятий)")
+
+    attestations = data.get("attestations", {})
+    if attestations:
+        lines.append("\n📋 Аттестации:")
+        for subj, marks in attestations.items():
+            a1 = marks.get("att1") or "—"
+            a2 = marks.get("att2") or "—"
+            lines.append(f"  {subj}: 1-я {a1} / 2-я {a2}")
+    else:
+        lines.append("\n📋 Аттестации: данных нет (семестр ещё не начался или страница изменилась)")
+
+    return "\n".join(lines) if lines else "Нет данных."
 
 
 # ─── Удаление аккаунта ────────────────────────────────────────────────────────

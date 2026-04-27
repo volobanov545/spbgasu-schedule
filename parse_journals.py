@@ -111,19 +111,42 @@ def parse_main_page(html: str) -> dict:
     all_tables = soup.find_all("table")
     log.info("Таблиц на странице: %d", len(all_tables))
     for table in all_tables:
-        headers = [th.get_text(strip=True) for th in table.find_all("th")]
-        log.info("Заголовки таблицы: %s", headers[:6])
-        if "1-я атт." not in headers and "2-я атт." not in " ".join(headers):
+        ths = table.find_all("th")
+        if ths:
+            headers = [th.get_text(strip=True) for th in ths]
+        else:
+            first_row = table.find("tr")
+            headers = [td.get_text(strip=True) for td in first_row.find_all("td")] if first_row else []
+        log.info("Заголовки таблицы: %s", headers[:8])
+
+        att1_col = att2_col = subj_col = None
+        for i, h in enumerate(headers):
+            hl = h.lower()
+            if "1" in hl and "атт" in hl:
+                att1_col = i
+            elif "2" in hl and "атт" in hl:
+                att2_col = i
+            elif any(w in hl for w in ("дисциплин", "предмет", "наименован")):
+                subj_col = i
+
+        if att1_col is None and att2_col is None:
             continue
+        if subj_col is None:
+            subj_col = 1
+
+        max_col = max(c for c in [att1_col, att2_col, subj_col] if c is not None)
         for row in table.find_all("tr")[1:]:
             cells = row.find_all("td")
-            if len(cells) < 4:
+            if len(cells) <= max_col:
                 continue
-            subject = cells[1].get_text(strip=True)
-            att1    = cells[2].get_text(strip=True)
-            att2    = cells[3].get_text(strip=True)
+            subject = cells[subj_col].get_text(strip=True)
+            att1 = cells[att1_col].get_text(strip=True) if att1_col is not None else ""
+            att2 = cells[att2_col].get_text(strip=True) if att2_col is not None else ""
             if subject:
-                attestations[subject] = {"att1": att1, "att2": att2}
+                attestations[subject] = {
+                    "att1": att1 or "—",
+                    "att2": att2 or "—",
+                }
 
     log.info("Главная: %d предметов, посещаемость %s%%", len(attestations), stats.get("present_pct", "?"))
     return {"stats": stats, "attestations": attestations}
