@@ -24,9 +24,43 @@ PORTAL_LOGIN = os.environ.get("PORTAL_LOGIN", "")
 PORTAL_PASS  = os.environ.get("PORTAL_PASS", "")
 STUDENT_NAME = os.environ.get("STUDENT_NAME", "Лобанов")
 STATE_FILE   = Path(__file__).parent / "journals_state.json"
+SESSION_DIR  = Path(os.environ.get("DATA_DIR", ".")) / "sessions"
 
 
 # ─── Playwright ───────────────────────────────────────────────────────────────
+
+def _session_file(portal_login: str) -> Path:
+    SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    return SESSION_DIR / f"{portal_login}.json"
+
+
+async def login_with_session(context, portal_login: str, portal_pass: str):
+    """Логинится используя сохранённые cookies если они живы, иначе логинится заново."""
+    sf = _session_file(portal_login)
+    if sf.exists():
+        await context.add_cookies(json.loads(sf.read_text()))
+        page = await context.new_page()
+        await page.goto(f"{PORTAL_URL}/lk/", wait_until="domcontentloaded", timeout=30000)
+        if "/auth/" not in page.url:
+            print("[INFO] Сессия восстановлена из кэша")
+            return page
+        await page.close()
+        print("[INFO] Сессия устарела, логинимся заново")
+
+    page = await context.new_page()
+    page.set_default_timeout(60000)
+    await page.goto(f"{PORTAL_URL}/auth/", wait_until="domcontentloaded", timeout=90000)
+    await page.wait_for_selector("input[name='USER_LOGIN']", state="visible", timeout=30000)
+    await page.locator("input[name='USER_LOGIN']").press_sequentially(portal_login, delay=50)
+    await page.locator("input[name='USER_PASSWORD']").press_sequentially(portal_pass, delay=50)
+    async with page.expect_navigation(timeout=60000):
+        await page.evaluate("document.querySelector('form').submit()")
+    await page.wait_for_timeout(2000)
+    cookies = await context.cookies()
+    sf.write_text(json.dumps(cookies))
+    print("[INFO] Авторизация успешна, сессия сохранена")
+    return page
+
 
 async def login(page, login: str = "", password: str = ""):
     _login = login or PORTAL_LOGIN
@@ -232,12 +266,13 @@ def parse_lk_main(portal_login: str, portal_pass: str, student_name: str = "") -
 
 
 async def _async_quick(portal_login: str, portal_pass: str) -> dict:
-    """Только главная /lk/ — без обхода журналов. ~30 сек вместо 2 мин."""
+    """Только главная /lk/ — без обхода журналов. С кэшем сессии ~10 сек."""
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
-        page    = await browser.new_page()
-        await login(page, portal_login, portal_pass)
-        await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
+        context = await browser.new_context()
+        page    = await login_with_session(context, portal_login, portal_pass)
+        if "/lk/" not in page.url:
+            await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(2000)
         main_data = parse_main_page(await page.content())
         await browser.close()

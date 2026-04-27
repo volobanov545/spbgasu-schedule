@@ -1,0 +1,16 @@
+.git
+.github
+.gitverse
+*.png
+*.jpg
+*.html
+schedule.ics
+session.ics
+journals_state.json
+pending_notification.json
+old_*.ics
+old_*.json
+*.sh
+__pycache__
+*.pyc
+.env
