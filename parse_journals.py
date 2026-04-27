@@ -171,7 +171,11 @@ async def async_main():
         for subject, url in journal_urls:
             try:
                 await page.goto(url, wait_until="networkidle", timeout=60000)
-                await page.wait_for_timeout(1500)
+                # Ждём пока таблица с именем студента реально отрисуется
+                try:
+                    await page.wait_for_selector(f"text={STUDENT_NAME}", timeout=15000)
+                except Exception:
+                    print(f"[WARN] {subject}: имя '{STUDENT_NAME}' не появилось на странице")
                 html   = await page.content()
                 result = parse_journal_html(html, STUDENT_NAME, subject)
                 if result:

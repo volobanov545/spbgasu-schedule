@@ -7,6 +7,7 @@
   TG_CHANNEL — username или id канала (например @gasu4ka)
 """
 
+import json
 import os
 import sys
 from datetime import datetime
@@ -170,8 +171,6 @@ def build_journal_diff_message(old: dict, new: dict) -> str | None:
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    import json as _json
-
     if len(sys.argv) < 3:
         print("Использование: notify.py old.ics new.ics [old_journals.json new_journals.json]")
         sys.exit(1)
