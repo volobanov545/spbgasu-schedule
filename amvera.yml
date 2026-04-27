@@ -7,6 +7,5 @@ build:
   useCache: true
 
 run:
-  scriptName: ""
   command: python bot.py
   persistenceMount: /data
