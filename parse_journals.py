@@ -272,8 +272,7 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
         browser = await pw.chromium.launch(headless=True)
         context = await browser.new_context()
         page    = await login_with_session(context, portal_login, portal_pass)
-        if "/lk/" not in page.url:
-            await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
+        await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(2000)
         main_data = parse_main_page(await page.content())
         await browser.close()
