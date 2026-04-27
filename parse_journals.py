@@ -297,7 +297,14 @@ async def _async_run_for_user(portal_login: str, portal_pass: str, student_name:
             await page.wait_for_selector("table", timeout=8000)
         except Exception:
             log.warning("Таблица на /lk/ не появилась за 8 сек")
-        await page.wait_for_timeout(1500)
+        try:
+            await page.wait_for_function(
+                "() => document.querySelectorAll('table tr').length > 2",
+                timeout=12000,
+            )
+        except Exception:
+            log.warning("Таблица не заполнилась за 12 сек — берём что есть")
+        await page.wait_for_timeout(500)
         html = await page.content()
         _save_debug_html(html, "debug_lk.html")
         main_data = parse_main_page(html)
@@ -328,9 +335,20 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
                 await page.wait_for_selector("table", timeout=8000)
             except Exception:
                 log.warning("Таблица на /lk/ не появилась за 8 сек")
-            await page.wait_for_timeout(1500)
+            # Ждём пока в таблице появятся реальные строки с данными
+            try:
+                await page.wait_for_function(
+                    "() => document.querySelectorAll('table tr').length > 2",
+                    timeout=12000,
+                )
+                log.info("Таблица заполнилась данными")
+            except Exception:
+                log.warning("Таблица не заполнилась за 12 сек — берём что есть")
+            await page.wait_for_timeout(500)
             html = await page.content()
             _save_debug_html(html, "debug_lk.html")
+            await page.screenshot(path=str(DATA_DIR / "debug_lk.png"), full_page=True)
+            log.info("Скриншот сохранён: debug_lk.png")
             main_data = parse_main_page(html)
             await browser.close()
     finally:

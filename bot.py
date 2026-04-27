@@ -465,6 +465,17 @@ async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_document(document=open(path, "rb"), filename="debug_lk.html")
 
 
+async def cmd_sendpng(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    from pathlib import Path
+    path = Path(os.environ.get("DATA_DIR", ".")) / "debug_lk.png"
+    if not path.exists():
+        await update.message.reply_text("debug_lk.png не найден — сначала вызови /stats")
+        return
+    await update.message.reply_photo(photo=open(path, "rb"))
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -508,6 +519,7 @@ def main():
     app.add_handler(CommandHandler("users", cmd_users))
     app.add_handler(CommandHandler("remove", cmd_remove))
     app.add_handler(CommandHandler("sendhtml", cmd_sendhtml))
+    app.add_handler(CommandHandler("sendpng", cmd_sendpng))
 
     log.info("Bot started")
     app.run_polling(drop_pending_updates=True)
