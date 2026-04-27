@@ -55,10 +55,13 @@ from telegram import (
     InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
     KeyboardButton,
-    BotCommand,           # нужен для set_my_commands() в _post_init
-    MenuButtonCommands,   # кнопка «≡» в поле ввода — видна даже в пустом чате
-    ChatAction,           # константы для send_chat_action (typing, upload_document и т.д.)
+    BotCommand,
+    MenuButtonCommands,
 )
+try:
+    from telegram import ChatAction           # ptb v21
+except ImportError:
+    from telegram.constants import ChatAction  # ptb v22+
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
