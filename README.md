@@ -1,79 +1,77 @@
-# Расписание СПбГАСУ — 3-СУЗСс-2
+# GASUCHKA — расписание СПбГАСУ 3-СУЗСс-2
 
-Автоматический парсер расписания с [rasp.spbgasu.ru](https://rasp.spbgasu.ru/).  
-Обновляется 3 раза в день через GitVerse CI/CD: в 07:00, 13:30 и 21:00 МСК.
+Автоматическая система мониторинга расписания, посещаемости и аттестаций для группы 3-СУЗСс-2.  
+Данные берутся из личного кабинета [portal.spbgasu.ru](https://portal.spbgasu.ru).
 
-Генерирует два календаря:
-- `schedule.ics` — основное расписание (прошлая неделя + текущая + 2 следующие)
-- `session.ics` — экзамены сессии (все экзамены начиная с сегодня)
+## Что умеет
 
-## Подписка на календарь
+- Парсит расписание (прошлая неделя + текущая + 2 следующие) → синхронизирует в Яндекс.Календарь
+- Отслеживает изменения в расписании (переносы, замены, отмены) → уведомление в Telegram-канал
+- Парсит журналы посещаемости и аттестаций → личное уведомление при новом пропуске или аттестации
+- Запускается автоматически 3 раза в день через GitVerse CI/CD
 
-### Основное расписание
+## Расписание обновлений
+
+| Время МСК | Cron |
+|-----------|------|
+| 07:00 | `0 4 * * *` |
+| 13:30 | `30 10 * * *` |
+| 21:00 | `0 18 * * *` |
+
+## Подписка на расписание
+
+**Яндекс.Календарь** — синхронизируется напрямую через CalDAV, обновляется мгновенно после каждого запуска CI.
+
+**ICS-файл** (для других приложений):
 ```
 https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/schedule.ics
 ```
 
-### Сессия (экзамены)
+## Telegram-канал
+
+[@gasu4ka](https://t.me/gasu4ka) — уведомления об изменениях в расписании для всей группы.
+
+## Файлы проекта
+
+| Файл | Назначение |
+|------|------------|
+| `parse_portal.py` | Парсер расписания (Playwright → portal.spbgasu.ru) |
+| `parse_journals.py` | Парсер журналов посещаемости и аттестаций |
+| `sync_yandex.py` | Синхронизация ICS → Яндекс.Календарь через CalDAV |
+| `notify.py` | Уведомления: расписание → канал, журналы → личка |
+| `schedule.ics` | Текущее расписание |
+| `journals_state.json` | Текущее состояние журналов (посещаемость, аттестации) |
+| `.gitverse/workflows/update_schedule.yml` | CI/CD pipeline |
+
+## Как работает CI
+
 ```
-https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/session.ics
-```
-
-### Яндекс.Календарь
-1. Открыть [calendar.yandex.ru](https://calendar.yandex.ru)
-2. Нажать **«+»** → **«Подписаться на календарь»**
-3. Вставить URL выше → **«Подписаться»**
-
-### Google Calendar
-1. Настройки → **«Добавить календарь»** → **«По URL»**
-2. Вставить URL выше
-
-## Как работает
-
-Парсер пробует источники данных по приоритету:
-
-1. **Excel endpoint** — самый быстрый, без браузера (`/getExcel.php`)
-2. **HTML через requests** — лёгкий запрос без JS-рендеринга
-3. **Playwright** — полноценный браузер (Chromium headless), нужен если сайт требует JS
-4. **Fallback HTML** — `saved_resource.html` из репозитория, если сайт недоступен
-
-При наличии вкладки **«Сессия»** на сайте дополнительно парсятся экзамены → `session.ics`.
-
-GitVerse CI/CD запускает парсер с российских серверов (сайт СПбГАСУ блокирует зарубежные IP).  
-Если расписание изменилось — коммитит обновлённый `.ics` в репозиторий.
-
-## Локальный запуск
-
-```bash
-# Установить зависимости
-pip install -r requirements.txt
-pip install openpyxl
-playwright install chromium
-
-# Автоматический режим (Excel → requests → Playwright → fallback)
-python parse_schedule.py
-
-# Только ближайшие 14 дней
-python parse_schedule.py --days 14
-
-# Принудительно через Playwright
-python parse_schedule.py --playwright
-
-# Из сохранённого HTML файла
-python parse_schedule.py --file saved_resource.html
-
-# Указать другой выходной файл
-python parse_schedule.py --output my_schedule.ics --session-output my_session.ics
+Checkout
+  └─ Сохранить старые schedule.ics и journals_state.json
+       └─ parse_portal.py → новый schedule.ics
+            └─ parse_journals.py → новый journals_state.json
+                 └─ notify.py → уведомления если что-то изменилось
+                      └─ sync_yandex.py → обновить Яндекс.Календарь
+                           └─ git commit + push если были изменения
 ```
 
-Или через готовый скрипт (делает git push после обновления):
-```bash
-bash run_update.sh
-```
+## Секреты GitVerse
 
-## Смена группы (каждый сентябрь)
+| Секрет | Описание |
+|--------|----------|
+| `PORTAL_LOGIN` | Логин от portal.spbgasu.ru (студенческий номер) |
+| `PORTAL_PASS` | Пароль от портала |
+| `YANDEX_LOGIN` | Логин Яндекса (без @yandex.ru) |
+| `YANDEX_APPPASS` | Пароль приложения Яндекса для CalDAV |
+| `TG_TOKEN` | Токен Telegram-бота @gasu4ka_bot |
+| `TG_CHANNEL` | Username канала (`@gasu4ka`) |
+| `TG_OWNER_ID` | Telegram chat_id владельца для личных уведомлений |
+| `GV_TOKEN` | Токен GitVerse для git push из CI |
 
-В `parse_schedule.py` изменить константу `GROUP` — последняя цифра это номер курса:
+## Смена группы
+
+В `parse_portal.py` изменить константу (каждый сентябрь):
 ```python
-GROUP = "3-СУЗСс-2"  # → "3-СУЗСс-3" на 3 курсе, "3-СУЗСс-4" на 4-м
+# parse_portal.py не использует GROUP — фильтрация идёт по логину студента
+# просто обновить PORTAL_LOGIN / PORTAL_PASS в секретах GitVerse
 ```
