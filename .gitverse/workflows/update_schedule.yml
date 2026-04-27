@@ -48,13 +48,16 @@ jobs:
           YANDEX_APPPASS: ${{ secrets.YANDEX_APPPASS }}
         run: python sync_yandex.py
 
-      - name: Commit and push if changed
+      - name: Commit and push to GitVerse
         run: |
           git config user.name  "gitverse-actions"
           git config user.email "actions@gitverse.ru"
           git diff --quiet schedule.ics journals_state.json pending_notification.json && echo "Без изменений" || (
             git add schedule.ics journals_state.json pending_notification.json &&
             git commit -m "chore: update schedule $(date +'%Y-%m-%d')" &&
-            git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main &&
-            git push https://volobanov545:${{ secrets.GH_TOKEN }}@github.com/volobanov545/spbgasu-schedule.git main
+            git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main
           )
+
+      - name: Mirror to GitHub
+        run: |
+          git push https://volobanov545:${{ secrets.GH_TOKEN }}@github.com/volobanov545/spbgasu-schedule.git main --force
