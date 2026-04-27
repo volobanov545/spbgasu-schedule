@@ -37,17 +37,6 @@ jobs:
           TG_CHANNEL: ${{ secrets.TG_CHANNEL }}
         run: python notify.py old_schedule.ics schedule.ics
 
-      - name: Commit debug screenshots
-        if: always()
-        run: |
-          git config user.name  "gitverse-actions"
-          git config user.email "actions@gitverse.ru"
-          git add -f debug_login.png debug_after_login.png 2>/dev/null || true
-          git diff --cached --quiet || (
-            git commit -m "debug: login screenshots" &&
-            git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main
-          )
-
       - name: Sync to Яндекс.Календарь
         env:
           YANDEX_LOGIN:   ${{ secrets.YANDEX_LOGIN }}

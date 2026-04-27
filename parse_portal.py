@@ -156,7 +156,6 @@ async def login(page):
     await page.locator(pass_sel).click()
     await page.locator(pass_sel).press_sequentially(PORTAL_PASS, delay=50)
 
-    await page.screenshot(path=str(Path(__file__).parent / "debug_login.png"))
     print("[DEBUG] Форма заполнена, отправляю...")
 
     # Ждём навигации явно
@@ -164,7 +163,6 @@ async def login(page):
         await page.evaluate("document.querySelector('form').submit()")
 
     await page.wait_for_timeout(2000)
-    await page.screenshot(path=str(Path(__file__).parent / "debug_after_login.png"), full_page=True)
     print(f"[INFO] Авторизация: {page.url}")
 
 
@@ -257,19 +255,11 @@ async def async_main():
 
         await go_to_schedule(page)
 
-        # Сохраняем HTML и скриншот для отладки
-        debug_html = Path(__file__).parent / "debug_schedule.html"
-        debug_png  = Path(__file__).parent / "debug_schedule.png"
-        debug_html.write_text(await page.content(), encoding="utf-8")
-        await page.screenshot(path=str(debug_png), full_page=True)
-        print(f"[DEBUG] HTML сохранён: {debug_html}")
-        print(f"[DEBUG] Скриншот сохранён: {debug_png}")
-
         events = await collect_events(page)
         await browser.close()
 
     if not events:
-        print("[WARN] Не найдено ни одного занятия — проверь debug_schedule.html")
+        print("[WARN] Не найдено ни одного занятия")
         sys.exit(1)
 
     ics_data = build_ics(events)
