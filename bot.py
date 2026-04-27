@@ -149,10 +149,16 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_connect_yandex(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         return
+    query = update.callback_query
+    if query:
+        await query.answer()
+        send = query.message.reply_text
+    else:
+        send = update.message.reply_text
     user = get_user(update.effective_user.id)
     if not user or user.get("banned"):
         return ConversationHandler.END
-    await update.message.reply_text(YC_INSTRUCTION)
+    await send(YC_INSTRUCTION)
     return WAIT_YC2_LOGIN
 
 
@@ -175,7 +181,6 @@ async def got_yc2_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query:
-        await query.answer()
         send = query.message.reply_text
         tid  = query.from_user.id
     else:
@@ -231,7 +236,6 @@ def _format_stats(data: dict) -> str:
 async def cmd_unregister(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query:
-        await query.answer()
         remove_user(query.from_user.id)
         await query.message.reply_text("Аккаунт удалён.")
     else:
@@ -243,9 +247,21 @@ async def cmd_unregister(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     data = query.data
 
+    # Кнопки для всех пользователей
+    if data == "stats":
+        await query.answer()
+        await cmd_stats(update, ctx)
+        return
+
+    if data == "unregister":
+        await query.answer()
+        await cmd_unregister(update, ctx)
+        return
+
+    # Админские действия — только для овнера
+    await query.answer()
     if query.from_user.id != OWNER_ID:
         return
 
@@ -280,15 +296,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         tid = int(data.split(":")[1])
         unban_user(tid)
         await query.edit_message_text(query.message.text + "\n\n✅ Разблокирован")
-
-    elif data == "stats":
-        await cmd_stats(update, ctx)
-
-    elif data == "connect_yandex":
-        await cmd_connect_yandex(update, ctx)
-
-    elif data == "unregister":
-        await cmd_unregister(update, ctx)
 
 
 # ─── Админ-команды ────────────────────────────────────────────────────────────
@@ -383,7 +390,10 @@ def main():
     )
 
     yc_handler = ConversationHandler(
-        entry_points=[CommandHandler("connect_yandex", cmd_connect_yandex, filters=filters.ChatType.PRIVATE)],
+        entry_points=[
+            CommandHandler("connect_yandex", cmd_connect_yandex, filters=filters.ChatType.PRIVATE),
+            CallbackQueryHandler(cmd_connect_yandex, pattern="^connect_yandex$"),
+        ],
         states={
             WAIT_YC2_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc2_login)],
             WAIT_YC2_PASS:  [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc2_pass)],
