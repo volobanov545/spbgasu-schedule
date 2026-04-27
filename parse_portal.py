@@ -51,99 +51,90 @@ def make_uid(day_str: str, start: str, subject: str) -> str:
 def parse_schedule_html(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     events = []
-    current_date = None
 
-    # Ищем все текстовые блоки страницы через обход тегов
-    all_text_blocks = []
-    for tag in soup.find_all(True):
-        if tag.find(True):  # пропускаем контейнеры
+    # Заголовки дней — h2 с датой "Пн 20.04.2026"
+    day_pattern = re.compile(r"(Пн|Вт|Ср|Чт|Пт|Сб|Вс)\s+\d{2}\.\d{2}\.\d{4}")
+
+    for h2 in soup.find_all("h2"):
+        h2_text = h2.get_text(strip=True)
+        if not day_pattern.search(h2_text):
             continue
-        text = tag.get_text(strip=True)
-        if text:
-            all_text_blocks.append((tag, text))
+        current_date = parse_date(h2_text)
+        if not current_date:
+            continue
 
-    # Более надёжный подход: ищем структурные блоки
-    # День — это заголовок вида "Пн 27.04.2026"
-    day_pattern = re.compile(r"^(Пн|Вт|Ср|Чт|Пт|Сб|Вс)\s+\d{2}\.\d{2}\.\d{4}$")
-    time_pattern = re.compile(r"\d{1,2}:\d{2}[–\-]\d{1,2}:\d{2}")
+        # Карточки событий идут после h2 в div.schedule-content
+        content = h2.find_next_sibling("div", class_="schedule-content")
+        if not content:
+            continue
 
-    # Ищем блоки дней через заголовочные теги (h1-h4) или div с нужным паттерном
-    for tag in soup.find_all(["h1", "h2", "h3", "h4", "div", "p", "span"]):
-        text = tag.get_text(" ", strip=True)
-        if day_pattern.match(text):
-            current_date = parse_date(text)
-
-        # Ищем карточки уроков — они содержат время и название предмета
-        if current_date and time_pattern.search(text):
-            event = extract_event(tag, current_date)
+        for card in content.find_all("div", attrs={"data-pd-tooltip": "true"}):
+            event = extract_event(card, current_date)
             if event:
                 events.append(event)
 
     return events
 
 
-def extract_event(tag, current_date) -> dict | None:
-    """Извлекает данные урока из тега-карточки."""
-    full_text = tag.get_text(" ", strip=True)
+def extract_event(card, current_date) -> dict | None:
+    """Извлекает данные урока из карточки div[data-pd-tooltip]."""
 
-    time_m = re.search(r"(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})", full_text)
-    if not time_m:
+    # Время: span.text-l.font-bold → "9:00-10:30"
+    time_tag = card.find("span", class_="font-bold")
+    if not time_tag:
         return None
+    time_text = time_tag.get_text(strip=True)
+    m = re.match(r"(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})", time_text)
+    if not m:
+        return None
+    start_str, end_str = m.group(1), m.group(2)
 
-    start_str = time_m.group(1)
-    end_str   = time_m.group(2)
+    # Предмет: h3.text-lg.text-gray-600
+    h3 = card.find("h3", class_="text-lg")
+    if not h3:
+        return None
+    # Тип занятия — span внутри h3
+    type_span = h3.find("span")
+    lesson_type = type_span.get_text(strip=True) if type_span else ""
+    if type_span:
+        type_span.decompose()
+    subject = h3.get_text(strip=True)
 
-    # Тип занятия (лаб./пр./п. и т.д.)
-    type_m = re.search(r"\b(лаб|пр|лек|п)\b\.?", full_text, re.IGNORECASE)
-    lesson_type = type_m.group(0) if type_m else ""
-
-    # Аудитория (формат: цифры/буква, например 102/С или 401/С)
-    room_m = re.search(r"\b(\d{2,4}[/а-яА-Я\w]*)\b", full_text)
-    room = room_m.group(1) if room_m else ""
-
-    # Убираем время, тип, аудиторию — остаётся примерно название + преподаватель
-    leftover = full_text
-    leftover = re.sub(r"\d{1,2}:\d{2}[–\-]\d{1,2}:\d{2}", "", leftover)
-    leftover = re.sub(r"\d+\s*пара", "", leftover)
-    leftover = re.sub(r"\b(лаб|пр|лек|п)\b\.?", "", leftover, flags=re.IGNORECASE)
-    leftover = re.sub(r"\b\d{2,4}[/\w]*\b", "", leftover)
-    leftover = re.sub(r"\s+", " ", leftover).strip()
-
-    # Преподаватель — формат "Фамилия И.О."
-    teacher_m = re.findall(r"[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.", leftover)
-    teacher = ", ".join(teacher_m)
-
-    # Группа
-    group_m = re.search(r"\d+-[А-ЯЁа-яё]+-\d+", leftover)
-    group = group_m.group(0) if group_m else ""
-
-    # Название предмета — то что осталось после вычета учителя и группы
-    subject = leftover
-    for t in teacher_m:
-        subject = subject.replace(t, "")
-    if group:
-        subject = subject.replace(group, "")
-    subject = re.sub(r"\s+", " ", subject).strip().strip(",").strip()
+    # Аудитория и преподаватели — col-span-2 блоки
+    cols = card.find_all("div", class_="col-span-2")
+    room = ""
+    teacher = ""
+    for col in cols:
+        label = col.find("span", class_="text-gray-500")
+        if not label:
+            continue
+        label_text = label.get_text(strip=True)
+        value_span = col.find("span", class_="text-gray-700")
+        value = value_span.get_text(strip=True) if value_span else ""
+        if "Аудитория" in label_text:
+            room = value
+        elif "Преподаватели" in label_text:
+            teacher = value
 
     if not subject:
         return None
 
-    def make_dt(time_str: str):
-        h, m = map(int, time_str.split(":"))
+    def make_dt(t: str):
+        h, mn = map(int, t.split(":"))
         return datetime(current_date.year, current_date.month, current_date.day,
-                        h, m, tzinfo=TZ)
+                        h, mn, tzinfo=TZ)
 
-    summary = f"{subject}"
+    summary = subject
     if lesson_type:
         summary += f" ({lesson_type})"
 
     return {
-        "uid":      make_uid(str(current_date), start_str, subject),
-        "summary":  summary,
-        "dtstart":  make_dt(start_str),
-        "dtend":    make_dt(end_str),
-        "location": room,
-        "description": "\n".join(filter(None, [teacher, group])),
+        "uid":         make_uid(str(current_date), start_str, subject),
+        "summary":     summary,
+        "dtstart":     make_dt(start_str),
+        "dtend":       make_dt(end_str),
+        "location":    room,
+        "description": teacher,
     }
 
 
