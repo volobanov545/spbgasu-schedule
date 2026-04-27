@@ -32,6 +32,13 @@ import asyncio
 import logging
 import os
 import re
+import urllib.request
+from datetime import datetime, date, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from icalendar import Calendar
 
 from telegram import (
     Update,
@@ -41,6 +48,7 @@ from telegram import (
     KeyboardButton,
     BotCommand,           # нужен для set_my_commands() в _post_init
     MenuButtonCommands,   # кнопка «≡» в поле ввода — видна даже в пустом чате
+    ChatAction,           # константы для send_chat_action (typing, upload_document и т.д.)
 )
 from telegram.ext import (
     Application,
@@ -65,8 +73,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
-TOKEN    = os.environ["TG_TOKEN"]
-OWNER_ID = int(os.environ["TG_OWNER_ID"])  # 796071683 — только он видит /users, /approve и пр.
+TOKEN      = os.environ["TG_TOKEN"]
+OWNER_ID   = int(os.environ["TG_OWNER_ID"])   # 796071683 — только он видит /users, /approve и пр.
+TG_CHANNEL = os.environ.get("TG_CHANNEL", "") # @gasu4ka — канал для расписания и напоминаний
+
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
+
+# Глобальный планировщик задач (утреннее расписание + напоминания).
+# AsyncIOScheduler работает в том же event loop что и бот — не нужен отдельный поток.
+scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
 # Состояния ConversationHandler регистрации (0–4)
 WAIT_LOGIN, WAIT_PASSWORD, WAIT_YC_CHOICE, WAIT_YC_LOGIN, WAIT_YC_PASS = range(5)
@@ -104,6 +119,21 @@ async def _post_init(app):
         "Нажми НАЧАТЬ чтобы подключиться."
     )
     await app.bot.set_my_short_description("Расписание и посещаемость СПбГАСУ")
+
+    # Ежедневные задачи через APScheduler.
+    # В 08:00 — отправляем расписание на сегодня в канал.
+    # В 07:50 — планируем напоминания за 30 мин до каждой пары.
+    scheduler.add_job(morning_schedule,         "cron", hour=8, minute=0,  args=[app])
+    scheduler.add_job(schedule_daily_reminders, "cron", hour=7, minute=50, args=[app])
+    scheduler.start()
+    # Если бот перезапустился в течение дня — сразу ставим напоминания на оставшиеся пары
+    await schedule_daily_reminders(app)
+    log.info("APScheduler запущен")
+
+
+async def _post_shutdown(app):
+    """Корректно останавливаем планировщик при выключении бота."""
+    scheduler.shutdown(wait=False)
 
 
 # ─── Вспомогательные функции ──────────────────────────────────────────────────
@@ -488,8 +518,12 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await send("⏳ Твоя заявка ещё не подтверждена администратором.")
         return
 
-    # Отправляем «загружаю» и сохраняем ссылку на сообщение — потом отредактируем его
-    # вместо отправки нового, чтобы чат не засорялся лишними сообщениями.
+    # send_chat_action показывает «печатает...» в шапке чата пока грузятся данные.
+    # Telegram не поддерживает кастомные тексты action — только системные варианты.
+    # ChatAction.TYPING — единственный подходящий для «готовлю ответ».
+    await ctx.bot.send_chat_action(chat_id=tid, action=ChatAction.TYPING)
+
+    # Отправляем «загружаю» и сохраняем ссылку — потом отредактируем вместо нового сообщения.
     loading_msg = await send("⏳ Загружаю данные с портала, подожди ~20 сек...")
     try:
         from parse_journals import parse_lk_quick
@@ -499,8 +533,11 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         log.exception("stats error for %s", user["login"])
         await loading_msg.edit_text(f"❌ Ошибка при загрузке: {e}")
         return
-    # protect_content=True — запрещает пересылать сообщение: данные об оценках личные.
-    await loading_msg.edit_text(text, parse_mode="HTML")
+
+    refresh_kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔄 Обновить", callback_data="refresh_stats"),
+    ]])
+    await loading_msg.edit_text(text, parse_mode="HTML", reply_markup=refresh_kb)
 
     # Синхронизация Яндекс.Календаря — тихо, без сообщения об успехе.
     # Если пароль протух — сообщаем и просим обновить в настройках.
@@ -560,7 +597,160 @@ def _format_stats(data: dict) -> str:
     else:
         lines.append("\n📋 <b>Аттестации:</b> данных нет")
 
+    now = datetime.now(MOSCOW_TZ)
+    lines.append(f"\n\n🕐 обновлено {now.strftime('%H:%M, %d.%m.%Y')}")
+
     return "\n".join(lines) if lines else "Нет данных."
+
+
+# ─── Расписание: парсинг ICS + утреннее сообщение + напоминания ──────────────
+
+ICS_URL = "https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/schedule.ics"
+DAYS_RU = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+
+
+def _get_lessons_for_date(target_date: date) -> list[dict]:
+    """
+    Читает schedule.ics из локального файла (бот берёт его из репо при деплое).
+    Если файл не найден — скачивает актуальную версию с GitVerse.
+    Возвращает список пар на указанную дату, отсортированных по времени.
+    """
+    ics_path = Path(__file__).parent / "schedule.ics"
+    if ics_path.exists():
+        raw = ics_path.read_bytes()
+    else:
+        with urllib.request.urlopen(ICS_URL, timeout=30) as r:
+            raw = r.read()
+
+    cal     = Calendar.from_ical(raw)
+    lessons = []
+    for component in cal.walk():
+        if component.name != "VEVENT":
+            continue
+        dtstart = component.get("dtstart")
+        if not dtstart:
+            continue
+        dt = dtstart.dt
+        # dt может быть datetime или date — обрабатываем оба варианта
+        if isinstance(dt, datetime):
+            dt          = dt.replace(tzinfo=MOSCOW_TZ) if dt.tzinfo is None else dt.astimezone(MOSCOW_TZ)
+            lesson_date = dt.date()
+        else:
+            lesson_date = dt
+            dt          = datetime.combine(dt, datetime.min.time()).replace(tzinfo=MOSCOW_TZ)
+
+        if lesson_date != target_date:
+            continue
+
+        dtend = component.get("dtend")
+        if dtend:
+            de = dtend.dt
+            dt_end = (de.replace(tzinfo=MOSCOW_TZ) if de.tzinfo is None else de.astimezone(MOSCOW_TZ)) \
+                if isinstance(de, datetime) else \
+                datetime.combine(de, datetime.min.time()).replace(tzinfo=MOSCOW_TZ)
+        else:
+            dt_end = dt + timedelta(hours=2)
+
+        lessons.append({
+            "uid":         str(component.get("UID", "")),
+            "summary":     str(component.get("SUMMARY", "Пара")),
+            "dtstart":     dt,
+            "dtend":       dt_end,
+            "location":    str(component.get("LOCATION", "")),
+            "description": str(component.get("DESCRIPTION", "")),
+        })
+
+    lessons.sort(key=lambda x: x["dtstart"])
+    return lessons
+
+
+def _format_day_schedule(target_date: date, lessons: list[dict]) -> str:
+    """Форматирует список пар дня в HTML для отправки в канал."""
+    day_name = DAYS_RU[target_date.weekday()]
+    text = f"📅 <b>Расписание на {day_name}, {target_date.strftime('%d.%m')}</b>\n\n"
+    for i, l in enumerate(lessons, 1):
+        time_s = l["dtstart"].strftime("%H:%M")
+        time_e = l["dtend"].strftime("%H:%M")
+        text  += f"<b>{i}.</b> 🕐 {time_s}–{time_e}\n"
+        text  += f"   📚 {l['summary']}\n"
+        if l["location"]:
+            text += f"   🚪 {l['location']}\n"
+        if l["description"]:
+            text += f"   👤 {l['description']}\n"
+        text += "\n"
+    return text.strip()
+
+
+async def morning_schedule(app):
+    """
+    Cron-задача в 08:00 МСК — отправляет расписание на сегодня в канал @gasu4ka.
+    Если пар нет (выходной, каникулы) — ничего не отправляем, не спамим.
+    TG_CHANNEL должен быть задан в переменных окружения Amvera.
+    """
+    if not TG_CHANNEL:
+        log.warning("TG_CHANNEL не задан — утреннее расписание не отправлено")
+        return
+    today = date.today()
+    try:
+        lessons = _get_lessons_for_date(today)
+    except Exception as e:
+        log.error("Ошибка чтения расписания: %s", e)
+        return
+    if not lessons:
+        return
+    await app.bot.send_message(
+        chat_id=TG_CHANNEL,
+        text=_format_day_schedule(today, lessons),
+        parse_mode="HTML",
+    )
+    log.info("Утреннее расписание отправлено: %d пар", len(lessons))
+
+
+async def send_lesson_reminder(app, lesson: dict):
+    """Отправляет напоминание за 30 мин до пары в канал."""
+    if not TG_CHANNEL:
+        return
+    time_s = lesson["dtstart"].strftime("%H:%M")
+    time_e = lesson["dtend"].strftime("%H:%M")
+    text   = f"⏰ <b>Через 30 минут</b>\n\n📚 {lesson['summary']}\n🕐 {time_s}–{time_e}"
+    if lesson["location"]:
+        text += f"  ·  🚪 {lesson['location']}"
+    if lesson["description"]:
+        text += f"\n👤 {lesson['description']}"
+    await app.bot.send_message(chat_id=TG_CHANNEL, text=text, parse_mode="HTML")
+
+
+async def schedule_daily_reminders(app):
+    """
+    Cron-задача в 07:50 МСК (и при старте бота) — планирует APScheduler-джобы
+    типа 'date' за 30 мин до каждой пары сегодняшнего дня.
+    replace_existing=True — безопасно при повторном вызове (напр. после рестарта).
+    Пары у которых remind_dt уже в прошлом — пропускаем.
+    """
+    if not TG_CHANNEL:
+        return
+    today = date.today()
+    try:
+        lessons = _get_lessons_for_date(today)
+    except Exception as e:
+        log.error("Ошибка расписания для напоминаний: %s", e)
+        return
+    now       = datetime.now(MOSCOW_TZ)
+    scheduled = 0
+    for lesson in lessons:
+        remind_dt = lesson["dtstart"] - timedelta(minutes=30)
+        if remind_dt > now:
+            scheduler.add_job(
+                send_lesson_reminder,
+                "date",
+                run_date=remind_dt,
+                args=[app, lesson],
+                id=f"reminder_{lesson['uid']}",
+                replace_existing=True,
+            )
+            scheduled += 1
+    if scheduled:
+        log.info("Запланировано напоминаний: %d", scheduled)
 
 
 # ─── Настройки ───────────────────────────────────────────────────────────────
@@ -685,6 +875,11 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if data == "cancel_action":
         await query.answer()
         await query.edit_message_text("Отменено.")
+        return
+
+    if data == "refresh_stats":
+        await query.answer("🔄 Обновляю...")
+        await cmd_stats(update, ctx)
         return
 
     if data == "disconnect_yc":
@@ -899,7 +1094,7 @@ async def cmd_sendpng(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 def main():
     init_db()
-    app = Application.builder().token(TOKEN).post_init(_post_init).build()
+    app = Application.builder().token(TOKEN).post_init(_post_init).post_shutdown(_post_shutdown).build()
 
     # not_kb — фильтр, исключающий тексты кнопок reply_keyboard из ConversationHandler.
     # Без него нажатие «📋 Аттестации» во время диалога регистрации интерпретировалось бы
