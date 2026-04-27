@@ -7,14 +7,24 @@
   YANDEX_CAL_NAME — название календаря (по умолчанию: СПбГАСУ)
 """
 
+import io
 import os
 import sys
+import urllib.request
 from pathlib import Path
 
 import caldav
 from icalendar import Calendar
 
-ICS_FILE = Path(__file__).parent / "schedule.ics"
+ICS_FILE    = Path(__file__).parent / "schedule.ics"
+ICS_URL     = "https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/schedule.ics"
+
+
+def _fetch_ics(ics_path: Path | None) -> bytes:
+    if ics_path and ics_path.exists():
+        return ics_path.read_bytes()
+    with urllib.request.urlopen(ICS_URL, timeout=30) as r:
+        return r.read()
 
 CALDAV_URL  = "https://caldav.yandex.ru"
 LOGIN       = os.environ.get("YANDEX_LOGIN", "")
@@ -24,10 +34,6 @@ CAL_NAME    = os.environ.get("YANDEX_CAL_NAME", "СПбГАСУ")
 
 def sync_calendar(ylogin: str, ypass: str, ics_path: Path | None = None, cal_name: str = "СПбГАСУ"):
     """Синхронизирует ICS в Яндекс.Календарь. Вызывается ботом для каждого пользователя."""
-    ics = ics_path or ICS_FILE
-    if not ics.exists():
-        raise FileNotFoundError(f"ICS не найден: {ics}")
-
     client = caldav.DAVClient(
         url=CALDAV_URL,
         username=f"{ylogin}@yandex.ru",
@@ -42,8 +48,7 @@ def sync_calendar(ylogin: str, ypass: str, ics_path: Path | None = None, cal_nam
         calendar = principal.make_calendar(name=cal_name)
         is_new = True
 
-    with open(ics, "rb") as f:
-        raw = f.read()
+    raw = _fetch_ics(ics_path)
     cal = Calendar.from_ical(raw)
     new_events: dict[str, bytes] = {}
     for component in cal.walk():
