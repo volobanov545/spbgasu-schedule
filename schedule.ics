@@ -5,519 +5,410 @@ X-WR-CALNAME:СПбГАСУ Расписание
 X-WR-TIMEZONE:Europe/Moscow
 BEGIN:VEVENT
 SUMMARY:Информационные технологии графичес
- кого проектирования Аудитория -4*/С Препо
- даватели Замена Елсаков Александр Павло
- вич Группа Сопротивление материалов. Ос
- новы теории упругости и пластичности Ау
- дитория Преподаватели \, Группа Метролог
- ия\, стандартизация и сертификация Аудит
- ория Преподаватели \, Кострикин М. Группа
-  (пр.)
+ кого проектирования (пр.)
 DTSTART;TZID=Europe/Moscow:20260420T090000
 DTEND;TZID=Europe/Moscow:20260420T103000
-UID:2b52ba374dcbf769e8e41c352b59313b@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Алейник В.И.\, Островск
- ая Н.В.\, Летенко Д.Г.\n3-СУЗСс-2
-LOCATION:00
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Информационные технологии графичес
- кого проектирования Аудитория -4*/С Препо
- даватели Замена Елсаков Александр Павло
- вич Группа (пр.)
-DTSTART;TZID=Europe/Moscow:20260420T090000
-DTEND;TZID=Europe/Moscow:20260420T103000
-UID:1906e5599d6cdf7b791bbe5524fdcb5e@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\n3-СУЗСс-2
-LOCATION:00
+UID:c261891b6be9ff9db1e2f7fd1e8bc968@portal.spbgasu.ru
+DESCRIPTION:Хиврич М.А.
+LOCATION:330-4*/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности Аудитория
-  Преподаватели \, Группа
+ ории упругости и пластичности
 DTSTART;TZID=Europe/Moscow:20260420T104500
 DTEND;TZID=Europe/Moscow:20260420T121500
-UID:79b6ab4621fe5f0ac2ed5622b54cf942@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\n3-СУЗ
- Сс-2
-LOCATION:10
+UID:825df5b94459c39c155250811a8459e0@portal.spbgasu.ru
+DESCRIPTION:Алейник В.И.\,
+LOCATION:319/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Метрология\, стандартизация и серти
- фикация Аудитория Преподаватели \, Костр
- икин М. Группа (лаб.)
+ фикация (лаб.)
 DTSTART;TZID=Europe/Moscow:20260420T123000
 DTEND;TZID=Europe/Moscow:20260420T140000
-UID:5c70ab23d0e214a51bb893e00f9fd371@portal.spbgasu.ru
-DESCRIPTION:Летенко Д.Г.\n3-СУЗСс-2
-LOCATION:12
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Вт .. Информационные технологии граф
- ического проектирования Аудитория -5*/С П
- реподаватели Группа Высшая математика л
- . Аудитория Преподаватели Группа 1-СУЗСс-
- 2\, 2-СУЗСс-2\, \, 4-СУЗСс-2 Метрология\, станда
- ртизация и сертификация л. Аудитория Пре
- подаватели Группа 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-
- СУЗСс-2 (пр.)
-DTSTART;TZID=Europe/Moscow:20260420T090000
-DTEND;TZID=Europe/Moscow:20260420T103000
-UID:e8a42c78c5d1c61a8fb928ecec808855@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Немченко Е.И.\, Норин В.
- А.\n3-СУЗСс-2
-LOCATION:21
+UID:c7e9818b2db2d3400b6435c48b9027c5@portal.spbgasu.ru
+DESCRIPTION:Летенко Д.Г.\,
+LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Информационные технологии графичес
- кого проектирования Аудитория -5*/С Препо
- даватели Группа Высшая математика л. Ауд
- итория Преподаватели Группа 1-СУЗСс-2\, 2-С
- УЗСс-2\, \, 4-СУЗСс-2 Метрология\, стандартиз
- ация и сертификация л. Аудитория Препода
- ватели Группа 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-СУЗС
- с-2 (пр.)
+ кого проектирования (пр.)
 DTSTART;TZID=Europe/Moscow:20260421T090000
 DTEND;TZID=Europe/Moscow:20260421T103000
-UID:90237d9806fe1a1fa661e558a6a29578@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Немченко Е.И.\, Норин В.
- А.\n3-СУЗСс-2
-LOCATION:00
+UID:42a0ae45b132be3138535facd4a72912@portal.spbgasu.ru
+DESCRIPTION:Хиврич М.А.
+LOCATION:330-5*/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Информационные технологии графичес
- кого проектирования Аудитория -5*/С Препо
- даватели Группа (пр.)
-DTSTART;TZID=Europe/Moscow:20260421T090000
-DTEND;TZID=Europe/Moscow:20260421T103000
-UID:f20de5e305b3d26b66bdda27eaa41ad9@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\n3-СУЗСс-2
-LOCATION:00
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Высшая математика л. Аудитория Преп
- одаватели Группа \, 2-СУЗСс-2\, 3-СУЗСс-2\, 4-С
- УЗСс-2
+SUMMARY:Высшая математика (л.)
 DTSTART;TZID=Europe/Moscow:20260421T104500
 DTEND;TZID=Europe/Moscow:20260421T121500
-UID:77740ed8299921c6662ad77c3288d07b@portal.spbgasu.ru
-DESCRIPTION:Немченко Е.И.\n1-СУЗСс-2
-LOCATION:10
+UID:1c83f83141a3090e435494c4a210c516@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:701/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Метрология\, стандартизация и серти
- фикация л. Аудитория Преподаватели Груп
- па \, 2-СУЗСс-2\, 3-СУЗСс-2\, 4-СУЗСс-2
+ фикация (л.)
 DTSTART;TZID=Europe/Moscow:20260421T123000
 DTEND;TZID=Europe/Moscow:20260421T140000
-UID:bac2c3361dacd0d129dc0d7f0cb718bb@portal.spbgasu.ru
-DESCRIPTION:Норин В.А.\n1-СУЗСс-2
-LOCATION:12
+UID:0f17b6e0ec61ff2bfcab18a388e9f49e@portal.spbgasu.ru
+DESCRIPTION:Норин В.А.
+LOCATION:409/Г
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Ср .. Механика жидкости и газа л. Ауди
- тория Преподаватели Группа \, 2-СУЗСс-2\, 3-
- СУЗСс-2\, 4-СУЗСс-2 Инженерная геология л. А
- удитория Преподаватели Группа \, 2-СУЗСс-2
- \, 3-СУЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260421T090000
-DTEND;TZID=Europe/Moscow:20260421T103000
-UID:74fa3e25acf7f1839516d76975341d54@portal.spbgasu.ru
-DESCRIPTION:Романова Ю.В.\, Заводчикова М.Б.\n1-С
- УЗСс-2
-LOCATION:22
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Механика жидкости и газа л. Аудитори
- я Преподаватели Группа \, 2-СУЗСс-2\, 3-СУЗС
- с-2\, 4-СУЗСс-2 Инженерная геология л. Аудит
- ория Преподаватели Группа \, 2-СУЗСс-2\, 3-С
- УЗСс-2\, 4-СУЗСс-2
+SUMMARY:Механика жидкости и газа (л.)
 DTSTART;TZID=Europe/Moscow:20260422T090000
 DTEND;TZID=Europe/Moscow:20260422T103000
-UID:f682c622eea89a4b5bcbe05b0af70aa4@portal.spbgasu.ru
-DESCRIPTION:Романова Ю.В.\, Заводчикова М.Б.\n1-С
- УЗСс-2
-LOCATION:00
+UID:c3d27630488b301783358cb1ba46b40e@portal.spbgasu.ru
+DESCRIPTION:Романова Ю.В.
+LOCATION:349/А
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Механика жидкости и газа л. Аудитори
- я Преподаватели Группа \, 2-СУЗСс-2\, 3-СУЗС
- с-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260422T090000
-DTEND;TZID=Europe/Moscow:20260422T103000
-UID:de6f34a661127de9b3b3ae135bfe0697@portal.spbgasu.ru
-DESCRIPTION:Романова Ю.В.\n1-СУЗСс-2
-LOCATION:00
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Инженерная геология л. Аудитория Пр
- еподаватели Группа \, 2-СУЗСс-2\, 3-СУЗСс-2\, 4
- -СУЗСс-2
+SUMMARY:Инженерная геология (л.)
 DTSTART;TZID=Europe/Moscow:20260422T104500
 DTEND;TZID=Europe/Moscow:20260422T121500
-UID:e16a604cdc753ede79dd84e4b76a378b@portal.spbgasu.ru
-DESCRIPTION:Заводчикова М.Б.\n1-СУЗСс-2
-LOCATION:10
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Чт .. Сопротивление материалов. Осно
- вы теории упругости и пластичности л. Ау
- дитория Преподаватели Группа \, 2-СУЗСс-2\,
-  3-СУЗСс-2\, 4-СУЗСс-2 Технология бетона Ауд
- итория Преподаватели \, Группа 3-СУЗСс-2 (л
- аб.)
-DTSTART;TZID=Europe/Moscow:20260422T090000
-DTEND;TZID=Europe/Moscow:20260422T103000
-UID:8a39ec2314c28e3e6f85d7506f065000@portal.spbgasu.ru
-DESCRIPTION:Островская Н.В.\, Хренов Г.М.\, Черев
- ко С.А.\n1-СУЗСс-2
-LOCATION:23
+UID:e536306090039c2976d0ab2442d5325c@portal.spbgasu.ru
+DESCRIPTION:Заводчикова М.Б.
+LOCATION:701/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности л. Аудитор
- ия Преподаватели Группа \, 2-СУЗСс-2\, 3-СУЗ
- Сс-2\, 4-СУЗСс-2 Технология бетона Аудитори
- я Преподаватели \, Группа 3-СУЗСс-2 (лаб.)
+ ории упругости и пластичности (л.)
 DTSTART;TZID=Europe/Moscow:20260423T090000
 DTEND;TZID=Europe/Moscow:20260423T103000
-UID:d6a507279c3e707b2cc8f0824cfe1e76@portal.spbgasu.ru
-DESCRIPTION:Островская Н.В.\, Хренов Г.М.\, Черев
- ко С.А.\n1-СУЗСс-2
-LOCATION:00
+UID:6a674038070a82305f7c0664a2a9c081@portal.spbgasu.ru
+DESCRIPTION:Островская Н.В.
+LOCATION:701/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности л. Аудитор
- ия Преподаватели Группа \, 2-СУЗСс-2\, 3-СУЗ
- Сс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260423T090000
-DTEND;TZID=Europe/Moscow:20260423T103000
-UID:654f15b2308b2fa25c1d432d24b81d98@portal.spbgasu.ru
-DESCRIPTION:Островская Н.В.\n1-СУЗСс-2
-LOCATION:00
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Технология бетона Аудитория Препод
- аватели \, Группа (лаб.)
+SUMMARY:Технология бетона (лаб.)
 DTSTART;TZID=Europe/Moscow:20260423T104500
 DTEND;TZID=Europe/Moscow:20260423T121500
-UID:46a84430f0ecb3a6e197d3bb78553de4@portal.spbgasu.ru
-DESCRIPTION:Хренов Г.М.\, Черевко С.А.\n3-СУЗСс-2
-LOCATION:10
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Сб .. Сопротивление материалов. Осно
- вы теории упругости и пластичности Ауди
- тория Преподаватели \, Группа Высшая мат
- ематика Аудитория Преподаватели Группа 
- (пр.)
-DTSTART;TZID=Europe/Moscow:20260424T123000
-DTEND;TZID=Europe/Moscow:20260424T140000
-UID:0db91fc6f3dfb78f5cddcb48b4e16163@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\, Немч
- енко Е.И.\n3-СУЗСс-2
-LOCATION:25
+UID:975aa7a8b80260ecbc0ebaf55144642d@portal.spbgasu.ru
+DESCRIPTION:Хренов Г.М.\,
+LOCATION:102/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности Аудитория
-  Преподаватели \, Группа Высшая математи
- ка Аудитория Преподаватели Группа (пр.)
+ ории упругости и пластичности
 DTSTART;TZID=Europe/Moscow:20260425T123000
 DTEND;TZID=Europe/Moscow:20260425T140000
-UID:c4606eab69b6206bced00a6d8ae9d71f@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\, Немч
- енко Е.И.\n3-СУЗСс-2
-LOCATION:12
+UID:cbf9469865fca552eb8322faab18b940@portal.spbgasu.ru
+DESCRIPTION:Алейник В.И.\,
+LOCATION:319/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности Аудитория
-  Преподаватели \, Группа
-DTSTART;TZID=Europe/Moscow:20260425T123000
-DTEND;TZID=Europe/Moscow:20260425T140000
-UID:16b91470f69c9781c46b435f1f52276e@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\n3-СУЗ
- Сс-2
-LOCATION:12
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Высшая математика Аудитория Препод
- аватели Группа (пр.)
+SUMMARY:Высшая математика (пр.)
 DTSTART;TZID=Europe/Moscow:20260425T150000
 DTEND;TZID=Europe/Moscow:20260425T163000
-UID:53dab72a41ca9288e31ca4a9f73f7712@portal.spbgasu.ru
-DESCRIPTION:Немченко Е.И.\n3-СУЗСс-2
-LOCATION:15
+UID:c47ca742a33a2d4a76f9913af876ab05@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:409/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Пн .. Информационные технологии граф
- ического проектирования () Замена: Хиври
- ч Мария Александровна ➜ Елсаков Алексан
- др Павлович -4*/С Сопротивление материало
- в. Основы теории упругости и пластичност
- и () \, Метрология\, стандартизация и серти
- фикация () \, Кострикин М. Вт .. Информацион
- ные технологии графического проектиров
- ания () -5*/С Высшая математика (л.) 1-СУЗСс-2\
- , 2-СУЗСс-2\, \, 4-СУЗСс-2 Метрология\, стандар
- тизация и сертификация (л.) 1-СУЗСс-2\, 2-СУЗ
- Сс-2\, \, 4-СУЗСс-2 Ср .. Механика жидкости и г
- аза (л.) 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-СУЗСс-2 Инже
- нерная геология (л.) 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4
- -СУЗСс-2 Чт .. Сопротивление материалов. О
- сновы теории упругости и пластичности (л
- .) 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-СУЗСс-2 Технологи
- я бетона () \, Пт .. Нет занятий Сб .. Сопроти
- вление материалов. Основы теории упруго
- сти и пластичности () \, Высшая математика
-  () (пр.)
-DTSTART;TZID=Europe/Moscow:20260425T090000
-DTEND;TZID=Europe/Moscow:20260425T103000
-UID:3a7ab5a0ab8d22684e66885fc2dd6f98@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Алейник В.И.\, Островск
- ая Н.В.\, Летенко Д.Г.\, Хиврич М.А.\, Немченк
- о Е.И.\, Норин В.А.\, Романова Ю.В.\, Заводчик
- ова М.Б.\, Островская Н.В.\, Хренов Г.М.\, Чер
- евко С.А.\, Алейник В.И.\, Островская Н.В.\, Н
- емченко Е.И.\n3-СУЗСс-2
-LOCATION:20
+SUMMARY:Технология бетона (лаб.)
+DTSTART;TZID=Europe/Moscow:20260427T104500
+DTEND;TZID=Europe/Moscow:20260427T121500
+UID:edfea7730cf5f96b34d9ed439e07621f@portal.spbgasu.ru
+DESCRIPTION:Хренов Г.М.\,
+LOCATION:102/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Пн .. Информационные технологии граф
- ического проектирования () Замена: Хиври
- ч Мария Александровна ➜ Елсаков Алексан
- др Павлович -4*/С Сопротивление материало
- в. Основы теории упругости и пластичност
- и () \, Метрология\, стандартизация и серти
- фикация () \, Кострикин М. (пр.)
-DTSTART;TZID=Europe/Moscow:20260425T090000
-DTEND;TZID=Europe/Moscow:20260425T103000
-UID:97eb071d7b37ea920c4d05371cd3f955@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Алейник В.И.\, Островск
- ая Н.В.\, Летенко Д.Г.\n3-СУЗСс-2
-LOCATION:20
+SUMMARY:Технология бетона (л.)
+DTSTART;TZID=Europe/Moscow:20260427T123000
+DTEND;TZID=Europe/Moscow:20260427T140000
+UID:e2bc7c009a769df00e20675d5994dcb4@portal.spbgasu.ru
+DESCRIPTION:Пантелеев Д.А.
+LOCATION:401/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Высшая математика (л.)
+DTSTART;TZID=Europe/Moscow:20260428T104500
+DTEND;TZID=Europe/Moscow:20260428T121500
+UID:2d2c7fbeb419ce0a611b2e2f14ed306f@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:701/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Информационные технологии графичес
- кого проектирования () Замена: Хиврич Мар
- ия Александровна ➜ Елсаков Александр Па
- влович -4*/С Сопротивление материалов. Ос
- новы теории упругости и пластичности () \,
-  Метрология\, стандартизация и сертифика
- ция () \, Кострикин М. (пр.)
-DTSTART;TZID=Europe/Moscow:20260420T090000
-DTEND;TZID=Europe/Moscow:20260420T103000
-UID:934ea639722369d988839928d32df087@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Алейник В.И.\, Островск
- ая Н.В.\, Летенко Д.Г.\n3-СУЗСс-2
-LOCATION:00
+ кого проектирования (л.)
+DTSTART;TZID=Europe/Moscow:20260428T123000
+DTEND;TZID=Europe/Moscow:20260428T140000
+UID:cb7a644a812980f1f3a0be29f887475d@portal.spbgasu.ru
+DESCRIPTION:Евсиков И.А.
+LOCATION:401/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Информационные технологии графичес
- кого проектирования () Замена: Хиврич Мар
- ия Александровна ➜ Елсаков Александр Па
- влович -4*/С (пр.)
-DTSTART;TZID=Europe/Moscow:20260420T090000
-DTEND;TZID=Europe/Moscow:20260420T103000
-UID:86442b824900f4dfd35cc859f93734db@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\n3-СУЗСс-2
-LOCATION:00
+ кого проектирования (пр.)
+DTSTART;TZID=Europe/Moscow:20260428T150000
+DTEND;TZID=Europe/Moscow:20260428T163000
+UID:ccb774e33a4f225773facfb068d4d9d9@portal.spbgasu.ru
+DESCRIPTION:Хиврич М.А.
+LOCATION:330-3*/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности ()
-DTSTART;TZID=Europe/Moscow:20260420T104500
-DTEND;TZID=Europe/Moscow:20260420T121500
-UID:836c239df7e864606bab2f1becdba4bf@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\n3-СУЗ
- Сс-2
-LOCATION:10
+SUMMARY:Высшая математика (пр.)
+DTSTART;TZID=Europe/Moscow:20260429T104500
+DTEND;TZID=Europe/Moscow:20260429T121500
+UID:454ac0748d898e796d6adee21032f3cb@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:718/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Метрология\, стандартизация и серти
- фикация () \, Кострикин М. (лаб.)
-DTSTART;TZID=Europe/Moscow:20260420T123000
-DTEND;TZID=Europe/Moscow:20260420T140000
-UID:e40672922774c8453ebcce459ef0ce5d@portal.spbgasu.ru
-DESCRIPTION:Летенко Д.Г.\n3-СУЗСс-2
-LOCATION:12
+ фикация (лаб.)
+DTSTART;TZID=Europe/Moscow:20260429T123000
+DTEND;TZID=Europe/Moscow:20260429T140000
+UID:ce3b2b689af437176e7b14496062b29a@portal.spbgasu.ru
+DESCRIPTION:Летенко Д.Г.\,
+LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Вт .. Информационные технологии граф
- ического проектирования () -5*/С Высшая ма
- тематика (л.) 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-СУЗСс-2
-  Метрология\, стандартизация и сертифика
- ция (л.) 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-СУЗСс-2 (пр.)
-DTSTART;TZID=Europe/Moscow:20260420T090000
-DTEND;TZID=Europe/Moscow:20260420T103000
-UID:94d3c34e4e76cc6ba4c981e4a96b632a@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Немченко Е.И.\, Норин В.
- А.\n3-СУЗСс-2
-LOCATION:21
+SUMMARY:Сопротивление материалов. Основы те
+ ории упругости и пластичности (л.)
+DTSTART;TZID=Europe/Moscow:20260430T090000
+DTEND;TZID=Europe/Moscow:20260430T103000
+UID:99083b92c3e7c474ed1c8c28da822362@portal.spbgasu.ru
+DESCRIPTION:Островская Н.В.
+LOCATION:701/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Механика жидкости и газа
+DTSTART;TZID=Europe/Moscow:20260430T104500
+DTEND;TZID=Europe/Moscow:20260430T121500
+UID:ab22f9ec2035895184ba572d8d415194@portal.spbgasu.ru
+DESCRIPTION:Гурдин Р.А.\,
+LOCATION:226/Г
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Сопротивление материалов. Основы те
+ ории упругости и пластичности
+DTSTART;TZID=Europe/Moscow:20260502T090000
+DTEND;TZID=Europe/Moscow:20260502T103000
+UID:26e39ddd9327b6b2cebc15f7ce5b0834@portal.spbgasu.ru
+DESCRIPTION:Алейник В.И.\,
+LOCATION:323/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Инженерная геология (лаб.)
+DTSTART;TZID=Europe/Moscow:20260502T104500
+DTEND;TZID=Europe/Moscow:20260502T121500
+UID:66c61223b5e78c7c8a79637cc63b89b1@portal.spbgasu.ru
+DESCRIPTION:Заводчикова М.Б.\,
+LOCATION:206/Е
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Инженерная геология (л.)
+DTSTART;TZID=Europe/Moscow:20260502T123000
+DTEND;TZID=Europe/Moscow:20260502T140000
+UID:548f5d3376fe8d3db81c71eba85f371e@portal.spbgasu.ru
+DESCRIPTION:Заводчикова М.Б.
+LOCATION:401/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Информационные технологии графичес
- кого проектирования () -5*/С Высшая матема
- тика (л.) 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-СУЗСс-2 Мет
- рология\, стандартизация и сертификация 
- (л.) 1-СУЗСс-2\, 2-СУЗСс-2\, \, 4-СУЗСс-2 (пр.)
-DTSTART;TZID=Europe/Moscow:20260421T090000
-DTEND;TZID=Europe/Moscow:20260421T103000
-UID:0fa717f7821ee35d19c129541cc659d5@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\, Немченко Е.И.\, Норин В.
- А.\n3-СУЗСс-2
-LOCATION:00
+ кого проектирования (пр.)
+DTSTART;TZID=Europe/Moscow:20260504T090000
+DTEND;TZID=Europe/Moscow:20260504T103000
+UID:c531c17606dbfe9d3c978ea71019cf2f@portal.spbgasu.ru
+DESCRIPTION:Хиврич М.А.
+LOCATION:330-4*/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Информационные технологии графичес
- кого проектирования () -5*/С (пр.)
-DTSTART;TZID=Europe/Moscow:20260421T090000
-DTEND;TZID=Europe/Moscow:20260421T103000
-UID:c922a3e8bebe01238de74389b30220d9@portal.spbgasu.ru
-DESCRIPTION:Хиврич М.А.\n3-СУЗСс-2
-LOCATION:00
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Высшая математика (л.) \, 2-СУЗСс-2\, 3-СУ
- ЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260421T104500
-DTEND;TZID=Europe/Moscow:20260421T121500
-UID:4110e00a461c914732faa630c7082fe1@portal.spbgasu.ru
-DESCRIPTION:Немченко Е.И.\n1-СУЗСс-2
-LOCATION:10
+SUMMARY:Сопротивление материалов. Основы те
+ ории упругости и пластичности
+DTSTART;TZID=Europe/Moscow:20260504T104500
+DTEND;TZID=Europe/Moscow:20260504T121500
+UID:1bc307cea9ae8dc952738dad7f8ffc8f@portal.spbgasu.ru
+DESCRIPTION:Алейник В.И.\,
+LOCATION:319/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Метрология\, стандартизация и серти
- фикация (л.) \, 2-СУЗСс-2\, 3-СУЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260421T123000
-DTEND;TZID=Europe/Moscow:20260421T140000
-UID:fb76dc89ff5f6a782b1b77fe75250499@portal.spbgasu.ru
-DESCRIPTION:Норин В.А.\n1-СУЗСс-2
-LOCATION:12
+ фикация (лаб.)
+DTSTART;TZID=Europe/Moscow:20260504T123000
+DTEND;TZID=Europe/Moscow:20260504T140000
+UID:17e0fcac7750cbcf44afd803c4815322@portal.spbgasu.ru
+DESCRIPTION:Летенко Д.Г.\,
+LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Ср .. Механика жидкости и газа (л.) \, 2-
- СУЗСс-2\, 3-СУЗСс-2\, 4-СУЗСс-2 Инженерная гео
- логия (л.) \, 2-СУЗСс-2\, 3-СУЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260421T090000
-DTEND;TZID=Europe/Moscow:20260421T103000
-UID:731354bfbef1f076c63324e102768451@portal.spbgasu.ru
-DESCRIPTION:Романова Ю.В.\, Заводчикова М.Б.\n1-С
- УЗСс-2
-LOCATION:22
+SUMMARY:Информационные технологии графичес
+ кого проектирования (пр.)
+DTSTART;TZID=Europe/Moscow:20260505T090000
+DTEND;TZID=Europe/Moscow:20260505T103000
+UID:f30ec406f0ea144ec4a857fbfc8e00ac@portal.spbgasu.ru
+DESCRIPTION:Хиврич М.А.
+LOCATION:330-5*/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Механика жидкости и газа (л.) \, 2-СУЗС
- с-2\, 3-СУЗСс-2\, 4-СУЗСс-2 Инженерная геологи
- я (л.) \, 2-СУЗСс-2\, 3-СУЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260422T090000
-DTEND;TZID=Europe/Moscow:20260422T103000
-UID:07c6dc7ec9acfe7cc64c0f79b82e3721@portal.spbgasu.ru
-DESCRIPTION:Романова Ю.В.\, Заводчикова М.Б.\n1-С
- УЗСс-2
-LOCATION:00
+SUMMARY:Высшая математика (л.)
+DTSTART;TZID=Europe/Moscow:20260505T104500
+DTEND;TZID=Europe/Moscow:20260505T121500
+UID:d594a52a966a71a85b7414f5d306f01b@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:701/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Механика жидкости и газа (л.) \, 2-СУЗС
- с-2\, 3-СУЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260422T090000
-DTEND;TZID=Europe/Moscow:20260422T103000
-UID:080635e0ba01c5e9dcdf4570f63a3ab6@portal.spbgasu.ru
-DESCRIPTION:Романова Ю.В.\n1-СУЗСс-2
-LOCATION:00
+SUMMARY:Метрология\, стандартизация и серти
+ фикация (л.)
+DTSTART;TZID=Europe/Moscow:20260505T123000
+DTEND;TZID=Europe/Moscow:20260505T140000
+UID:c6d4112bf2d378157b81f3842472f215@portal.spbgasu.ru
+DESCRIPTION:Норин В.А.
+LOCATION:409/Г
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Инженерная геология (л.) \, 2-СУЗСс-2\, 3-
- СУЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260422T104500
-DTEND;TZID=Europe/Moscow:20260422T121500
-UID:9e500ccef7a55fe81dcdc76e54f14ef7@portal.spbgasu.ru
-DESCRIPTION:Заводчикова М.Б.\n1-СУЗСс-2
-LOCATION:10
+SUMMARY:Механика жидкости и газа (л.)
+DTSTART;TZID=Europe/Moscow:20260506T090000
+DTEND;TZID=Europe/Moscow:20260506T103000
+UID:49db0264a83112e36530dacd39f5f1a8@portal.spbgasu.ru
+DESCRIPTION:Романова Ю.В.
+LOCATION:349/А
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Чт .. Сопротивление материалов. Осно
- вы теории упругости и пластичности (л.) \, 
- 2-СУЗСс-2\, 3-СУЗСс-2\, 4-СУЗСс-2 Технология бе
- тона () \, 3-СУЗСс-2 (лаб.)
-DTSTART;TZID=Europe/Moscow:20260422T090000
-DTEND;TZID=Europe/Moscow:20260422T103000
-UID:42e49e9f5704d0208ad20c232d68ee9f@portal.spbgasu.ru
-DESCRIPTION:Островская Н.В.\, Хренов Г.М.\, Черев
- ко С.А.\n1-СУЗСс-2
-LOCATION:23
+SUMMARY:Инженерная геология (л.)
+DTSTART;TZID=Europe/Moscow:20260506T104500
+DTEND;TZID=Europe/Moscow:20260506T121500
+UID:6856efee934d213b47038dec26463aba@portal.spbgasu.ru
+DESCRIPTION:Заводчикова М.Б.
+LOCATION:701/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности (л.) \, 2-СУЗ
- Сс-2\, 3-СУЗСс-2\, 4-СУЗСс-2 Технология бетона
-  () \, 3-СУЗСс-2 (лаб.)
-DTSTART;TZID=Europe/Moscow:20260423T090000
-DTEND;TZID=Europe/Moscow:20260423T103000
-UID:aa507bd6447eabf8ca822c0205bd4aec@portal.spbgasu.ru
-DESCRIPTION:Островская Н.В.\, Хренов Г.М.\, Черев
- ко С.А.\n1-СУЗСс-2
-LOCATION:00
+ ории упругости и пластичности (л.)
+DTSTART;TZID=Europe/Moscow:20260507T090000
+DTEND;TZID=Europe/Moscow:20260507T103000
+UID:9482f2aa4c21d92a1adfae4cf8cfd394@portal.spbgasu.ru
+DESCRIPTION:Островская Н.В.
+LOCATION:701/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Технология бетона (лаб.)
+DTSTART;TZID=Europe/Moscow:20260507T104500
+DTEND;TZID=Europe/Moscow:20260507T121500
+UID:6b11c9b6918c7b7c033d38905efb2e27@portal.spbgasu.ru
+DESCRIPTION:Хренов Г.М.\,
+LOCATION:102/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Технология бетона (лаб.)
+DTSTART;TZID=Europe/Moscow:20260511T104500
+DTEND;TZID=Europe/Moscow:20260511T121500
+UID:4cd4f08084d4337aa5f9a61508aaede7@portal.spbgasu.ru
+DESCRIPTION:Хренов Г.М.\,
+LOCATION:102/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Технология бетона (л.)
+DTSTART;TZID=Europe/Moscow:20260511T123000
+DTEND;TZID=Europe/Moscow:20260511T140000
+UID:6ea2429549b457764b0060165c67ecf7@portal.spbgasu.ru
+DESCRIPTION:Пантелеев Д.А.
+LOCATION:401/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Высшая математика (л.)
+DTSTART;TZID=Europe/Moscow:20260512T104500
+DTEND;TZID=Europe/Moscow:20260512T121500
+UID:43f3e100d37ff33138dddb7606411c1a@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:701/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Информационные технологии графичес
+ кого проектирования (л.)
+DTSTART;TZID=Europe/Moscow:20260512T123000
+DTEND;TZID=Europe/Moscow:20260512T140000
+UID:799d452b949b9ba5802ed99ea69e9fe7@portal.spbgasu.ru
+DESCRIPTION:Евсиков И.А.
+LOCATION:401/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Информационные технологии графичес
+ кого проектирования (пр.)
+DTSTART;TZID=Europe/Moscow:20260512T150000
+DTEND;TZID=Europe/Moscow:20260512T163000
+UID:f8676bfba763d85a24a5f66a88c16340@portal.spbgasu.ru
+DESCRIPTION:Хиврич М.А.
+LOCATION:330-3*/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Высшая математика (пр.)
+DTSTART;TZID=Europe/Moscow:20260513T104500
+DTEND;TZID=Europe/Moscow:20260513T121500
+UID:e97a8574085db1a08efc25f602fbed6c@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:718/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Метрология\, стандартизация и серти
+ фикация (лаб.)
+DTSTART;TZID=Europe/Moscow:20260513T123000
+DTEND;TZID=Europe/Moscow:20260513T140000
+UID:2d45611f63e640a8c079c04b79d27724@portal.spbgasu.ru
+DESCRIPTION:Летенко Д.Г.\,
+LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности (л.) \, 2-СУЗ
- Сс-2\, 3-СУЗСс-2\, 4-СУЗСс-2
-DTSTART;TZID=Europe/Moscow:20260423T090000
-DTEND;TZID=Europe/Moscow:20260423T103000
-UID:70007207dd2e4d9a3e47c7b78c465598@portal.spbgasu.ru
-DESCRIPTION:Островская Н.В.\n1-СУЗСс-2
-LOCATION:00
+ ории упругости и пластичности (л.)
+DTSTART;TZID=Europe/Moscow:20260514T090000
+DTEND;TZID=Europe/Moscow:20260514T103000
+UID:9279b3206a7443ea340258c650e14fd8@portal.spbgasu.ru
+DESCRIPTION:Островская Н.В.
+LOCATION:701/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Технология бетона () (лаб.)
-DTSTART;TZID=Europe/Moscow:20260423T104500
-DTEND;TZID=Europe/Moscow:20260423T121500
-UID:320518ea090ec9c3ea5bf92a437c03f7@portal.spbgasu.ru
-DESCRIPTION:Хренов Г.М.\, Черевко С.А.\n3-СУЗСс-2
-LOCATION:10
-END:VEVENT
-BEGIN:VEVENT
-SUMMARY:Сб .. Сопротивление материалов. Осно
- вы теории упругости и пластичности () \, В
- ысшая математика () (пр.)
-DTSTART;TZID=Europe/Moscow:20260424T123000
-DTEND;TZID=Europe/Moscow:20260424T140000
-UID:3ee7aee3ad7b12322979fd864a12c4e3@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\, Немч
- енко Е.И.\n3-СУЗСс-2
-LOCATION:25
+SUMMARY:Механика жидкости и газа
+DTSTART;TZID=Europe/Moscow:20260514T104500
+DTEND;TZID=Europe/Moscow:20260514T121500
+UID:ba6271129cd42d221316366d21b939a3@portal.spbgasu.ru
+DESCRIPTION:Гурдин Р.А.\,
+LOCATION:226/Г
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности () \, Высшая
-  математика () (пр.)
-DTSTART;TZID=Europe/Moscow:20260425T123000
-DTEND;TZID=Europe/Moscow:20260425T140000
-UID:641f02fc39172af6a782f1a9b43f17d0@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\, Немч
- енко Е.И.\n3-СУЗСс-2
-LOCATION:12
+ ории упругости и пластичности
+DTSTART;TZID=Europe/Moscow:20260515T104500
+DTEND;TZID=Europe/Moscow:20260515T121500
+UID:7f6821db69e3a71c0790884f8f315f1e@portal.spbgasu.ru
+DESCRIPTION:Алейник В.И.\,
+LOCATION:321/С
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Механика жидкости и газа (л.)
+DTSTART;TZID=Europe/Moscow:20260515T123000
+DTEND;TZID=Europe/Moscow:20260515T140000
+UID:2cdd3d4b298f5bb683117eca86ce248e@portal.spbgasu.ru
+DESCRIPTION:Романова Ю.В.
+LOCATION:520/Г
 END:VEVENT
 BEGIN:VEVENT
 SUMMARY:Сопротивление материалов. Основы те
- ории упругости и пластичности ()
-DTSTART;TZID=Europe/Moscow:20260425T123000
-DTEND;TZID=Europe/Moscow:20260425T140000
-UID:effe6e4b893382be1cc02b6b3aa50f89@portal.spbgasu.ru
-DESCRIPTION:Алейник В.И.\, Островская Н.В.\n3-СУЗ
- Сс-2
-LOCATION:12
+ ории упругости и пластичности
+DTSTART;TZID=Europe/Moscow:20260516T090000
+DTEND;TZID=Europe/Moscow:20260516T103000
+UID:8a88aa07ecaf9b5c26b2a9bfada238c1@portal.spbgasu.ru
+DESCRIPTION:Алейник В.И.\,
+LOCATION:323/С
 END:VEVENT
 BEGIN:VEVENT
-SUMMARY:Высшая математика () (пр.)
-DTSTART;TZID=Europe/Moscow:20260425T150000
-DTEND;TZID=Europe/Moscow:20260425T163000
-UID:8cd37bce152f0eb7bbf5573c9746a0e6@portal.spbgasu.ru
-DESCRIPTION:Немченко Е.И.\n3-СУЗСс-2
-LOCATION:15
+SUMMARY:Инженерная геология (лаб.)
+DTSTART;TZID=Europe/Moscow:20260516T104500
+DTEND;TZID=Europe/Moscow:20260516T121500
+UID:b8dac6bdbba5020c881c87f67796cc75@portal.spbgasu.ru
+DESCRIPTION:Заводчикова М.Б.\,
+LOCATION:206/Е
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Инженерная геология (л.)
+DTSTART;TZID=Europe/Moscow:20260516T123000
+DTEND;TZID=Europe/Moscow:20260516T140000
+UID:ea4c1611efcdd671a9c5c3c59689bc3e@portal.spbgasu.ru
+DESCRIPTION:Заводчикова М.Б.
+LOCATION:401/С
 END:VEVENT
 END:VCALENDAR
