@@ -209,15 +209,16 @@ async def async_main():
     print(f"[DONE] Аттестации: {subjects_ok} предметов, пропуски: {absences_ok} журналов → {STATE_FILE}")
 
 
-async def _async_run_for_user(login: str, password: str, student_name: str) -> dict:
+async def _async_run_for_user(portal_login: str, portal_pass: str, student_name: str) -> dict:
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
         page    = await browser.new_page()
-        await login(page, login, password)
+        await login(page, portal_login, portal_pass)
         await page.goto(f"{PORTAL_URL}/lk/", wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(2000)
         main_data = parse_main_page(await page.content())
         absences  = await collect_journal_absences(page, student_name)
+
         await browser.close()
     return {
         "stats":        main_data["stats"],
