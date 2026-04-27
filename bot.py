@@ -4,7 +4,7 @@ import logging
 import os
 import re
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, BotCommand, MenuButtonCommands
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -28,6 +28,23 @@ OWNER_ID = int(os.environ["TG_OWNER_ID"])
 
 WAIT_LOGIN, WAIT_PASSWORD, WAIT_YC_CHOICE, WAIT_YC_LOGIN, WAIT_YC_PASS = range(5)
 WAIT_YC2_LOGIN, WAIT_YC2_PASS = range(10, 12)
+
+
+async def _post_init(app):
+    await app.bot.set_my_commands([
+        BotCommand("start",  "Главное меню"),
+        BotCommand("stats",  "Аттестации и посещаемость"),
+        BotCommand("cancel", "Отменить"),
+    ])
+    await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    await app.bot.set_my_description(
+        "🎓 GASUCHKA — мониторинг учёбы в СПбГАСУ\n\n"
+        "• Аттестации и посещаемость в реальном времени\n"
+        "• Расписание в Яндекс.Календарь\n"
+        "• Уведомления при изменениях расписания\n\n"
+        "Нажми НАЧАТЬ чтобы подключиться."
+    )
+    await app.bot.set_my_short_description("Расписание и посещаемость СПбГАСУ")
 
 def _test_yandex(ylogin: str, ypass: str) -> str | None:
     """Возвращает None если OK, иначе текст ошибки."""
@@ -73,26 +90,49 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         return
     user = get_user(update.effective_user.id)
+
     if user:
         if user.get("banned"):
             await update.message.reply_text("🚫 Доступ закрыт.")
             return ConversationHandler.END
         if not user["approved"]:
             await update.message.reply_text(
-                f"⏳ Ты уже зарегистрирован (логин: {user['login']}).\n"
-                "Заявка ещё не подтверждена администратором — ожидай."
+                "⏳ <b>Заявка на рассмотрении</b>\n\n"
+                f"Логин: <code>{user['login']}</code>\n\n"
+                "Ожидай подтверждения от администратора.",
+                parse_mode="HTML",
             )
             return ConversationHandler.END
-        yc = "подключён ✅" if user["yandex_login"] else "не подключён"
+        yc = "✅ подключён" if user["yandex_login"] else "не подключён"
         await update.message.reply_text(
-            f"Привет! Ты зарегистрирован (логин: {user['login']}).\n"
-            f"Яндекс.Календарь: {yc}",
+            "🎓 <b>GASUCHKA</b>\n\n"
+            f"👤 <code>{user['login']}</code>\n"
+            f"📅 Яндекс.Календарь: {yc}",
+            parse_mode="HTML",
             reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID),
         )
         return ConversationHandler.END
+
+    # Новый пользователь
     await update.message.reply_text(
-        "Привет! Я слежу за расписанием и журналами СПбГАСУ.\n\n"
-        "Введи свой логин от портала:"
+        "🎓 <b>GASUCHKA</b>\n\n"
+        "Мониторинг расписания и посещаемости СПбГАСУ.\n"
+        "Нужен аккаунт от студенческого портала.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register"),
+        ]]),
+    )
+    return ConversationHandler.END
+
+
+async def _start_register(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text(
+        "Введи логин от портала СПбГАСУ\n"
+        "(студенческий номер, например <code>24001234</code>):",
+        parse_mode="HTML",
     )
     return WAIT_LOGIN
 
@@ -576,12 +616,15 @@ async def cmd_sendpng(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 def main():
     init_db()
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).post_init(_post_init).build()
 
     not_kb = ~filters.Regex("^(" + "|".join(re.escape(b) for b in KB_BTNS) + ")$")
 
     reg_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", cmd_start, filters=filters.ChatType.PRIVATE)],
+        entry_points=[
+            CommandHandler("start", cmd_start, filters=filters.ChatType.PRIVATE),
+            CallbackQueryHandler(_start_register, pattern="^register$"),
+        ],
         states={
             WAIT_LOGIN:     [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_login)],
             WAIT_PASSWORD:  [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_password)],
