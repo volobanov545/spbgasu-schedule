@@ -4,7 +4,7 @@ import logging
 import os
 import re
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -17,7 +17,7 @@ from telegram.ext import (
 
 import caldav
 
-from db import init_db, add_user, set_yandex, approve_user, ban_user, unban_user, remove_user, get_user, get_all_users
+from db import init_db, add_user, set_yandex, clear_yandex, approve_user, ban_user, unban_user, remove_user, get_user, get_all_users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -53,28 +53,18 @@ YC_INSTRUCTION = (
 )
 
 
-BTN_STATS  = "📋 Аттестации"
-BTN_YC     = "📅 Яндекс.Календарь"
-BTN_USERS  = "👥 Пользователи"
-BTN_DELETE = "❌ Удалить аккаунт"
-KB_BTNS = {BTN_STATS, BTN_YC, BTN_USERS, BTN_DELETE}
+BTN_STATS    = "📋 Аттестации"
+BTN_USERS    = "👥 Пользователи"
+BTN_SETTINGS = "⚙️ Настройки"
+KB_BTNS = {BTN_STATS, BTN_USERS, BTN_SETTINGS}
 
 
-def reply_keyboard(is_owner: bool = False, has_yc: bool = False) -> ReplyKeyboardMarkup:
-    top = [KeyboardButton(BTN_STATS)] if has_yc else [KeyboardButton(BTN_STATS), KeyboardButton(BTN_YC)]
-    rows = [top]
+def reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
+    rows = [[KeyboardButton(BTN_STATS)]]
     if is_owner:
         rows.append([KeyboardButton(BTN_USERS)])
-    rows.append([KeyboardButton(BTN_DELETE)])
+    rows.append([KeyboardButton(BTN_SETTINGS)])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
-
-
-def main_menu() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📋 Аттестации", callback_data="stats")],
-        [InlineKeyboardButton("📅 Яндекс.Календарь", callback_data="connect_yandex")],
-        [InlineKeyboardButton("❌ Удалить аккаунт", callback_data="unregister")],
-    ])
 
 
 # ─── Регистрация ──────────────────────────────────────────────────────────────
@@ -97,7 +87,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"Привет! Ты зарегистрирован (логин: {user['login']}).\n"
             f"Яндекс.Календарь: {yc}",
-            reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID, has_yc=bool(user["yandex_login"])),
+            reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID),
         )
         return ConversationHandler.END
     await update.message.reply_text(
@@ -241,7 +231,7 @@ async def got_yc2_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     set_yandex(update.effective_user.id, yc_login, yc_pass)
     await update.message.reply_text(
         "✅ Яндекс.Календарь подключён!",
-        reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID, has_yc=True),
+        reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID),
     )
     return ConversationHandler.END
 
@@ -279,7 +269,7 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         log.exception("stats error for %s", user["login"])
         await send(f"❌ Ошибка при загрузке: {e}")
         return
-    await send(text, reply_markup=main_menu())
+    await send(text)
 
     if user["yandex_login"] and user["yandex_pass"]:
         try:
@@ -313,6 +303,30 @@ def _format_stats(data: dict) -> str:
         lines.append("\n📋 Аттестации: данных нет (семестр ещё не начался или страница изменилась)")
 
     return "\n".join(lines) if lines else "Нет данных."
+
+
+# ─── Настройки ───────────────────────────────────────────────────────────────
+
+async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    user = get_user(update.effective_user.id)
+    if not user or not user["approved"] or user.get("banned"):
+        return
+    if user["yandex_login"]:
+        yc_btn = InlineKeyboardButton("📅 Отключить Яндекс.Календарь", callback_data="disconnect_yc")
+        yc_status = f"подключён ({user['yandex_login']})"
+    else:
+        yc_btn = InlineKeyboardButton("📅 Подключить Яндекс.Календарь", callback_data="connect_yandex")
+        yc_status = "не подключён"
+    kb = InlineKeyboardMarkup([
+        [yc_btn],
+        [InlineKeyboardButton("❌ Удалить аккаунт", callback_data="unregister")],
+    ])
+    await update.message.reply_text(
+        f"⚙️ Настройки\n\nЯндекс.Календарь: {yc_status}",
+        reply_markup=kb,
+    )
 
 
 # ─── Удаление аккаунта ────────────────────────────────────────────────────────
@@ -382,6 +396,20 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Отменено.")
         return
 
+    if data == "disconnect_yc":
+        await query.answer()
+        tid = query.from_user.id
+        user = get_user(tid)
+        if user and user.get("yandex_login") and user.get("yandex_pass"):
+            try:
+                from sync_yandex import delete_yandex_calendar
+                await asyncio.to_thread(delete_yandex_calendar, user["yandex_login"], user["yandex_pass"])
+            except Exception as e:
+                log.warning("calendar delete error: %s", e)
+        clear_yandex(tid)
+        await query.edit_message_text("📅 Яндекс.Календарь отключён. Календарь «СПбГАСУ» удалён из Яндекса.")
+        return
+
     # Админские действия — только для овнера
     await query.answer()
     if query.from_user.id != OWNER_ID:
@@ -409,11 +437,10 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         approve_user(tid)
         await query.edit_message_text(query.message.text + "\n\n✅ Одобрено")
         try:
-            approved_user = get_user(tid)
             await ctx.bot.send_message(
                 chat_id=tid,
                 text="✅ Твоя заявка одобрена! Можешь пользоваться ботом.",
-                reply_markup=reply_keyboard(tid == OWNER_ID, has_yc=bool(approved_user and approved_user.get("yandex_login"))),
+                reply_markup=reply_keyboard(tid == OWNER_ID),
             )
         except Exception:
             pass
@@ -593,10 +620,9 @@ def main():
     app.add_handler(CommandHandler("sendpng", cmd_sendpng))
 
     # Обработчики кнопок reply-клавиатуры
-    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_STATS)}$")  & filters.ChatType.PRIVATE, cmd_stats))
-    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_YC)}$")     & filters.ChatType.PRIVATE, cmd_connect_yandex))
-    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_USERS)}$")  & filters.ChatType.PRIVATE, cmd_users))
-    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_DELETE)}$") & filters.ChatType.PRIVATE, cmd_unregister))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_STATS)}$")    & filters.ChatType.PRIVATE, cmd_stats))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_USERS)}$")    & filters.ChatType.PRIVATE, cmd_users))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_SETTINGS)}$") & filters.ChatType.PRIVATE, cmd_settings))
 
     log.info("Bot started")
     app.run_polling(drop_pending_updates=True)

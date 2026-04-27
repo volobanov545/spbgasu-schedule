@@ -94,6 +94,13 @@ def unban_user(telegram_id: int):
     conn.close()
 
 
+def clear_yandex(telegram_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE users SET yandex_login=NULL, yandex_pass_enc=NULL WHERE telegram_id=?", (telegram_id,))
+    conn.commit()
+    conn.close()
+
+
 def remove_user(telegram_id: int):
     conn = sqlite3.connect(DB_PATH)
     conn.execute("DELETE FROM users WHERE telegram_id=?", (telegram_id,))
