@@ -36,11 +36,12 @@ import re
 import urllib.request
 import warnings
 
-from telegram.warnings import PTBUserWarning
+try:
+    from telegram.warnings import PTBUserWarning as _PTBUserWarning
+except ImportError:
+    _PTBUserWarning = UserWarning  # type: ignore[assignment,misc]
 
-# per_message=False (умолчание) — правильный выбор: entry_point — callback-кнопка,
-# все последующие состояния — текстовые сообщения. PTBUserWarning здесь ложный.
-warnings.filterwarnings("ignore", message=".*per_message=False.*", category=PTBUserWarning)
+warnings.filterwarnings("ignore", message=".*per_message=False.*", category=_PTBUserWarning)
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
