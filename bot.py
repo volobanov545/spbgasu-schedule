@@ -1067,11 +1067,13 @@ async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
     from pathlib import Path
-    path = Path(os.environ.get("DATA_DIR", ".")) / "debug_lk.html"
+    owner = get_user(OWNER_ID)
+    login = owner["login"] if owner else "unknown"
+    path = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.html"
     if not path.exists():
-        await update.message.reply_text("debug_lk.html не найден — сначала вызови /stats")
+        await update.message.reply_text(f"{path.name} не найден — сначала вызови /stats")
         return
-    await update.message.reply_document(document=open(path, "rb"), filename="debug_lk.html")
+    await update.message.reply_document(document=open(path, "rb"), filename=path.name)
 
 
 async def cmd_sendpng(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1083,9 +1085,11 @@ async def cmd_sendpng(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
     from pathlib import Path
-    path = Path(os.environ.get("DATA_DIR", ".")) / "debug_lk.png"
+    owner = get_user(OWNER_ID)
+    login = owner["login"] if owner else "unknown"
+    path = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.png"
     if not path.exists():
-        await update.message.reply_text("debug_lk.png не найден — сначала вызови /stats")
+        await update.message.reply_text(f"{path.name} не найден — сначала вызови /stats")
         return
     await update.message.reply_photo(photo=open(path, "rb"))
 

@@ -310,7 +310,7 @@ async def _async_run_for_user(portal_login: str, portal_pass: str, student_name:
             log.warning("Таблица не заполнилась за 12 сек — берём что есть")
         await page.wait_for_timeout(500)
         html = await page.content()
-        _save_debug_html(html, "debug_lk.html")
+        _save_debug_html(html, f"debug_lk_{portal_login}.html")
         main_data = parse_main_page(html)
         absences  = await collect_journal_absences(page, student_name)
 
@@ -350,9 +350,9 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
                 log.warning("Таблица не заполнилась за 12 сек — берём что есть")
             await page.wait_for_timeout(500)
             html = await page.content()
-            _save_debug_html(html, "debug_lk.html")
-            await page.screenshot(path=str(DATA_DIR / "debug_lk.png"), full_page=True)
-            log.info("Скриншот сохранён: debug_lk.png")
+            _save_debug_html(html, f"debug_lk_{portal_login}.html")
+            await page.screenshot(path=str(DATA_DIR / f"debug_lk_{portal_login}.png"), full_page=True)
+            log.info("Скриншот сохранён: debug_lk_%s.png", portal_login)
             main_data = parse_main_page(html)
             await browser.close()
     finally:
