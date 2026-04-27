@@ -237,6 +237,7 @@ async def _start_register(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.message.reply_text(
+        "📝 <b>Регистрация — шаг 1 из 3</b>\n\n"
         "Введи логин от портала СПбГАСУ\n"
         "(студенческий номер, например <code>24001234</code>):",
         parse_mode="HTML",
@@ -247,20 +248,30 @@ async def _start_register(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def got_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Сохраняем логин в ctx.user_data (временное хранилище на время диалога)."""
     ctx.user_data["login"] = update.message.text.strip()
-    await update.message.reply_text("Теперь введи пароль:")
+    await update.message.reply_text(
+        "📝 <b>Регистрация — шаг 2 из 3</b>\n\n"
+        "Введи пароль от портала:",
+        parse_mode="HTML",
+    )
     return WAIT_PASSWORD
 
 
 async def got_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """
-    Сохраняем пароль и спрашиваем про Яндекс.Календарь.
+    Сохраняем пароль, удаляем сообщение с ним — пароль не должен висеть в истории.
     one_time_keyboard=True — клавиатура исчезает сразу после нажатия.
     Кнопки «✅ Да» / «❌ Нет» избавляют от необходимости что-то печатать.
     """
     ctx.user_data["password"] = update.message.text.strip()
+    try:
+        await update.message.delete()
+    except Exception:
+        pass  # нет прав на удаление — не критично
     await update.message.reply_text(
+        "📝 <b>Регистрация — шаг 3 из 3</b>\n\n"
         "Хочешь подключить Яндекс.Календарь?\n"
         "Расписание будет автоматически появляться в твоём календаре.",
+        parse_mode="HTML",
         reply_markup=ReplyKeyboardMarkup(
             [["✅ Да", "❌ Нет"]],
             one_time_keyboard=True,
@@ -291,9 +302,14 @@ async def got_yc_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     asyncio.to_thread() нужен потому что caldav делает синхронные HTTP-запросы,
     а мы не должны блокировать async event loop бота.
     При ошибке — возвращаем пользователя на ввод логина (он мог ошибиться в нём).
+    Пароль приложения удаляем из чата — он не должен висеть в истории.
     """
     yc_login = ctx.user_data.get("yc_login", "")
     yc_pass  = update.message.text.strip()
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
     await update.message.reply_text("⏳ Проверяю подключение к Яндекс.Календарю...")
     err = await asyncio.to_thread(_test_yandex, yc_login, yc_pass)
     if err:
@@ -404,9 +420,14 @@ async def got_yc2_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     Проверяем CalDAV и сохраняем. После подключения отправляем reply_keyboard —
     это нужно чтобы клавиатура обновилась (хотя визуально она не меняется,
     отправка гарантирует что она точно есть у пользователя).
+    Пароль приложения удаляем из чата.
     """
     yc_login = ctx.user_data.get("yc_login", "")
     yc_pass  = update.message.text.strip()
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
     await update.message.reply_text("⏳ Проверяю подключение к Яндекс.Календарю...")
     err = await asyncio.to_thread(_test_yandex, yc_login, yc_pass)
     if err:
@@ -467,16 +488,19 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await send("⏳ Твоя заявка ещё не подтверждена администратором.")
         return
 
-    await send("⏳ Загружаю данные с портала, подожди ~20 сек...")
+    # Отправляем «загружаю» и сохраняем ссылку на сообщение — потом отредактируем его
+    # вместо отправки нового, чтобы чат не засорялся лишними сообщениями.
+    loading_msg = await send("⏳ Загружаю данные с портала, подожди ~20 сек...")
     try:
         from parse_journals import parse_lk_quick
         data = await asyncio.to_thread(parse_lk_quick, user["login"], user["password"])
         text = _format_stats(data)
     except Exception as e:
         log.exception("stats error for %s", user["login"])
-        await send(f"❌ Ошибка при загрузке: {e}")
+        await loading_msg.edit_text(f"❌ Ошибка при загрузке: {e}")
         return
-    await send(text)
+    # protect_content=True — запрещает пересылать сообщение: данные об оценках личные.
+    await loading_msg.edit_text(text, parse_mode="HTML")
 
     # Синхронизация Яндекс.Календаря — тихо, без сообщения об успехе.
     # Если пароль протух — сообщаем и просим обновить в настройках.
@@ -494,14 +518,24 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
 
 
+def _fmt_grade(g: str) -> str:
+    """Форматирует оценку аттестации с эмодзи-индикатором."""
+    if not g or g == "—":
+        return "⏳ —"
+    if g.upper() in ("Н/А", "НА", "Н"):
+        return f"❌ {g}"
+    return f"✅ {g}"
+
+
 def _format_stats(data: dict) -> str:
     """
-    Форматирует словарь из parse_lk_quick() в читаемый текст.
+    Форматирует словарь из parse_lk_quick() в HTML для Telegram.
     data = {
         "stats": {"total_classes": int, "present_pct": float, "absent_pct": float, ...},
         "attestations": {"Предмет": {"att1": "А", "att2": "—"}, ...},
         "absences": {}  # в quick-режиме всегда пустой — журналы не обходим
     }
+    Оценки: А → ✅, Н/А → ❌, — → ⏳ (ещё не выставлена).
     """
     lines = []
 
@@ -510,17 +544,21 @@ def _format_stats(data: dict) -> str:
         total   = stats.get("total_classes", "?")
         present = stats.get("present_pct", "?")
         absent  = stats.get("absent_pct", "?")
-        lines.append(f"📊 Посещаемость: {present}% присутствий, {absent}% пропусков ({total} занятий)")
+        lines.append(
+            f"📊 <b>Посещаемость</b>\n"
+            f"✅ <b>{present}%</b> присутствий  ·  ❌ <b>{absent}%</b> пропусков\n"
+            f"📚 {total} занятий"
+        )
 
     attestations = data.get("attestations", {})
     if attestations:
-        lines.append("\n📋 Аттестации:")
+        lines.append("\n📋 <b>Аттестации</b>")
         for subj, marks in attestations.items():
-            a1 = marks.get("att1") or "—"
-            a2 = marks.get("att2") or "—"
-            lines.append(f"  {subj}: 1-я {a1} / 2-я {a2}")
+            a1 = _fmt_grade(marks.get("att1") or "—")
+            a2 = _fmt_grade(marks.get("att2") or "—")
+            lines.append(f"\n<b>{subj}</b>\n  1-я: {a1}  ·  2-я: {a2}")
     else:
-        lines.append("\n📋 Аттестации: данных нет (семестр ещё не начался или страница изменилась)")
+        lines.append("\n📋 <b>Аттестации:</b> данных нет")
 
     return "\n".join(lines) if lines else "Нет данных."
 
@@ -625,8 +663,8 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         Финальное удаление аккаунта пользователем.
         Порядок важен: сначала читаем user (нужны данные ЯК), потом удаляем из БД.
         Если удалить сначала — данные ЯК будут уже недоступны.
+        show_alert=True — всплывающий попап поверх чата, подтверждает действие.
         """
-        await query.answer()
         tid  = query.from_user.id
         user = get_user(tid)
         cal_msg = ""
@@ -640,9 +678,8 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 log.warning("calendar delete error: %s", e)
         remove_user(tid)
-        await query.edit_message_text(
-            f"Аккаунт удалён.{cal_msg} Напиши /start чтобы зарегистрироваться снова."
-        )
+        await query.answer(text=f"Аккаунт удалён.{cal_msg}", show_alert=True)
+        await query.edit_message_text("Аккаунт удалён. Напиши /start чтобы зарегистрироваться снова.")
         return
 
     if data == "cancel_action":
