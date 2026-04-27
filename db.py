@@ -33,13 +33,15 @@ def init_db():
             approved         INTEGER NOT NULL DEFAULT 0,
             banned           INTEGER NOT NULL DEFAULT 0,
             yandex_login     TEXT,
-            yandex_pass_enc  TEXT
+            yandex_pass_enc  TEXT,
+            student_name     TEXT
         )
     """)
     for col, definition in [
         ("yandex_login",    "TEXT"),
         ("yandex_pass_enc", "TEXT"),
         ("banned",          "INTEGER NOT NULL DEFAULT 0"),
+        ("student_name",    "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
@@ -49,15 +51,16 @@ def init_db():
     conn.close()
 
 
-def add_user(telegram_id: int, login: str, password: str):
+def add_user(telegram_id: int, login: str, password: str, student_name: str = ""):
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        """INSERT INTO users (telegram_id, portal_login, portal_pass_enc, approved)
-           VALUES (?, ?, ?, 0)
+        """INSERT INTO users (telegram_id, portal_login, portal_pass_enc, approved, student_name)
+           VALUES (?, ?, ?, 0, ?)
            ON CONFLICT(telegram_id) DO UPDATE SET
                portal_login    = excluded.portal_login,
-               portal_pass_enc = excluded.portal_pass_enc""",
-        (telegram_id, login, _enc(password)),
+               portal_pass_enc = excluded.portal_pass_enc,
+               student_name    = excluded.student_name""",
+        (telegram_id, login, _enc(password), student_name),
     )
     conn.commit()
     conn.close()
@@ -111,27 +114,28 @@ def remove_user(telegram_id: int):
 def get_user(telegram_id: int) -> dict | None:
     conn = sqlite3.connect(DB_PATH)
     row = conn.execute(
-        "SELECT portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc FROM users WHERE telegram_id=?",
+        "SELECT portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc, student_name FROM users WHERE telegram_id=?",
         (telegram_id,),
     ).fetchone()
     conn.close()
     if not row:
         return None
-    login, enc, approved, banned, ylogin, yenc = row
+    login, enc, approved, banned, ylogin, yenc, sname = row
     return {
-        "login":        login,
-        "password":     _dec(enc),
-        "approved":     bool(approved),
-        "banned":       bool(banned),
-        "yandex_login": ylogin,
-        "yandex_pass":  _dec(yenc) if yenc else None,
+        "login":         login,
+        "password":      _dec(enc),
+        "approved":      bool(approved),
+        "banned":        bool(banned),
+        "yandex_login":  ylogin,
+        "yandex_pass":   _dec(yenc) if yenc else None,
+        "student_name":  sname or "",
     }
 
 
 def get_all_users() -> list[dict]:
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(
-        "SELECT telegram_id, portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc FROM users"
+        "SELECT telegram_id, portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc, student_name FROM users"
     ).fetchall()
     conn.close()
     return [
@@ -143,6 +147,7 @@ def get_all_users() -> list[dict]:
             "banned":       bool(banned),
             "yandex_login": ylogin,
             "yandex_pass":  _dec(yenc) if yenc else None,
+            "student_name": sname or "",
         }
-        for tid, login, enc, approved, banned, ylogin, yenc in rows
+        for tid, login, enc, approved, banned, ylogin, yenc, sname in rows
     ]
