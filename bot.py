@@ -454,6 +454,17 @@ async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Удалён.")
 
 
+async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    from pathlib import Path
+    path = Path(os.environ.get("DATA_DIR", ".")) / "debug_lk.html"
+    if not path.exists():
+        await update.message.reply_text("debug_lk.html не найден — сначала вызови /stats")
+        return
+    await update.message.reply_document(document=open(path, "rb"), filename="debug_lk.html")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -496,6 +507,7 @@ def main():
     app.add_handler(CommandHandler("unban", cmd_unban))
     app.add_handler(CommandHandler("users", cmd_users))
     app.add_handler(CommandHandler("remove", cmd_remove))
+    app.add_handler(CommandHandler("sendhtml", cmd_sendhtml))
 
     log.info("Bot started")
     app.run_polling(drop_pending_updates=True)
