@@ -15,27 +15,54 @@ def _get_fernet() -> Fernet:
     return _fernet
 
 
+def _enc(s: str) -> str:
+    return _get_fernet().encrypt(s.encode()).decode()
+
+
+def _dec(s: str) -> str:
+    return _get_fernet().decrypt(s.encode()).decode()
+
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            telegram_id  INTEGER PRIMARY KEY,
-            portal_login TEXT NOT NULL,
-            portal_pass_enc TEXT NOT NULL,
-            approved     INTEGER NOT NULL DEFAULT 0
+            telegram_id      INTEGER PRIMARY KEY,
+            portal_login     TEXT NOT NULL,
+            portal_pass_enc  TEXT NOT NULL,
+            approved         INTEGER NOT NULL DEFAULT 0,
+            yandex_login     TEXT,
+            yandex_pass_enc  TEXT
         )
     """)
+    # Добавляем колонки если их нет (миграция старой БД)
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN yandex_login TEXT")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN yandex_pass_enc TEXT")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
 
 def add_user(telegram_id: int, login: str, password: str):
-    f = _get_fernet()
-    enc = f.encrypt(password.encode()).decode()
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
         "INSERT OR REPLACE INTO users (telegram_id, portal_login, portal_pass_enc, approved) VALUES (?, ?, ?, 0)",
-        (telegram_id, login, enc),
+        (telegram_id, login, _enc(password)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def set_yandex(telegram_id: int, ylogin: str, ypass: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "UPDATE users SET yandex_login=?, yandex_pass_enc=? WHERE telegram_id=?",
+        (ylogin, _enc(ypass), telegram_id),
     )
     conn.commit()
     conn.close()
@@ -58,30 +85,36 @@ def remove_user(telegram_id: int):
 def get_user(telegram_id: int) -> dict | None:
     conn = sqlite3.connect(DB_PATH)
     row = conn.execute(
-        "SELECT portal_login, portal_pass_enc, approved FROM users WHERE telegram_id=?",
+        "SELECT portal_login, portal_pass_enc, approved, yandex_login, yandex_pass_enc FROM users WHERE telegram_id=?",
         (telegram_id,),
     ).fetchone()
     conn.close()
     if not row:
         return None
-    login, enc, approved = row
-    password = _get_fernet().decrypt(enc.encode()).decode()
-    return {"login": login, "password": password, "approved": bool(approved)}
+    login, enc, approved, ylogin, yenc = row
+    return {
+        "login":        login,
+        "password":     _dec(enc),
+        "approved":     bool(approved),
+        "yandex_login": ylogin,
+        "yandex_pass":  _dec(yenc) if yenc else None,
+    }
 
 
 def get_all_users() -> list[dict]:
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(
-        "SELECT telegram_id, portal_login, portal_pass_enc, approved FROM users"
+        "SELECT telegram_id, portal_login, portal_pass_enc, approved, yandex_login, yandex_pass_enc FROM users"
     ).fetchall()
     conn.close()
-    f = _get_fernet()
     return [
         {
-            "telegram_id": tid,
-            "login": login,
-            "password": f.decrypt(enc.encode()).decode(),
-            "approved": bool(approved),
+            "telegram_id":  tid,
+            "login":        login,
+            "password":     _dec(enc),
+            "approved":     bool(approved),
+            "yandex_login": ylogin,
+            "yandex_pass":  _dec(yenc) if yenc else None,
         }
-        for tid, login, enc, approved in rows
+        for tid, login, enc, approved, ylogin, yenc in rows
     ]

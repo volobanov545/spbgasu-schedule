@@ -17,9 +17,65 @@ from icalendar import Calendar
 ICS_FILE = Path(__file__).parent / "schedule.ics"
 
 CALDAV_URL  = "https://caldav.yandex.ru"
-LOGIN       = os.environ["YANDEX_LOGIN"]
-APPPASS     = os.environ["YANDEX_APPPASS"]
+LOGIN       = os.environ.get("YANDEX_LOGIN", "")
+APPPASS     = os.environ.get("YANDEX_APPPASS", "")
 CAL_NAME    = os.environ.get("YANDEX_CAL_NAME", "СПбГАСУ")
+
+
+def sync_calendar(ylogin: str, ypass: str, ics_path: Path | None = None, cal_name: str = "СПбГАСУ"):
+    """Синхронизирует ICS в Яндекс.Календарь. Вызывается ботом для каждого пользователя."""
+    ics = ics_path or ICS_FILE
+    if not ics.exists():
+        raise FileNotFoundError(f"ICS не найден: {ics}")
+
+    client = caldav.DAVClient(
+        url=CALDAV_URL,
+        username=f"{ylogin}@yandex.ru",
+        password=ypass,
+    )
+    principal = client.principal()
+    calendars = principal.calendars()
+
+    is_new = False
+    calendar = next((c for c in calendars if c.get_display_name() == cal_name), None)
+    if calendar is None:
+        calendar = principal.make_calendar(name=cal_name)
+        is_new = True
+
+    with open(ics, "rb") as f:
+        raw = f.read()
+    cal = Calendar.from_ical(raw)
+    new_events: dict[str, bytes] = {}
+    for component in cal.walk():
+        if component.name != "VEVENT":
+            continue
+        uid = str(component.get("UID"))
+        single = Calendar()
+        single.add("prodid", "-//SPbГАСУ Schedule//RU")
+        single.add("version", "2.0")
+        single.add_component(component)
+        new_events[uid] = single.to_ical()
+
+    if not is_new:
+        for event in calendar.events():
+            try:
+                ec = Calendar.from_ical(event.data)
+                for comp in ec.walk():
+                    if comp.name == "VEVENT":
+                        if str(comp.get("UID")) not in new_events:
+                            event.delete()
+            except Exception:
+                pass
+
+    synced = 0
+    for ical_bytes in new_events.values():
+        try:
+            calendar.save_event(ical_bytes.decode())
+            synced += 1
+        except Exception:
+            pass
+
+    return synced
 
 
 def main():
