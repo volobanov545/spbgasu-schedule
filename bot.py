@@ -202,21 +202,12 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 def _format_stats(data: dict) -> str:
-    lines = ["📊 Твоя статистика:\n"]
-    stats = data.get("stats", {})
-    if stats:
-        lines.append(
-            f"Занятий проведено: {stats.get('total_classes', '?')}\n"
-            f"Присутствовал: {stats.get('present_pct', '?')}%\n"
-            f"Отсутствовал: {stats.get('absent_pct', '?')}%\n"
-        )
+    lines = ["📋 Аттестации:\n"]
     atts = data.get("attestations", {})
-    if atts:
-        lines.append("📋 Аттестации:")
-        for subj, marks in atts.items():
-            a1 = marks.get("att1", "—")
-            a2 = marks.get("att2", "—")
-            lines.append(f"  {subj}: 1-я {a1} / 2-я {a2}")
+    for subj, marks in atts.items():
+        a1 = marks.get("att1", "—")
+        a2 = marks.get("att2", "—")
+        lines.append(f"  {subj}: 1-я {a1} / 2-я {a2}")
     return "\n".join(lines)
 
 
