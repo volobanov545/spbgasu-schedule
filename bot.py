@@ -192,7 +192,14 @@ async def cmd_connect_yandex(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = get_user(update.effective_user.id)
     if not user or user.get("banned"):
         return ConversationHandler.END
-    await send(YC_INSTRUCTION)
+    if user["yandex_login"]:
+        await send(
+            f"📅 Яндекс.Календарь уже подключён (аккаунт: {user['yandex_login']}).\n\n"
+            "Чтобы обновить пароль приложения — введи логин Яндекса заново.\n"
+            "Или /cancel чтобы отменить."
+        )
+    else:
+        await send(YC_INSTRUCTION)
     return WAIT_YC2_LOGIN
 
 
