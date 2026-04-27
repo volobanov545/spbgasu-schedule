@@ -73,12 +73,17 @@ def sync_calendar(ylogin: str, ypass: str, ics_path: Path | None = None, cal_nam
                 pass
 
     synced = 0
+    first_err = None
     for ical_bytes in new_events.values():
         try:
             calendar.save_event(ical_bytes.decode())
             synced += 1
-        except Exception:
-            pass
+        except Exception as e:
+            if first_err is None:
+                first_err = e
+
+    if synced == 0 and new_events:
+        raise Exception(f"Не удалось сохранить ни одного события ({len(new_events)} шт.): {first_err}")
 
     return synced
 
