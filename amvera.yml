@@ -2,11 +2,9 @@ meta:
   environment: python
   toolchain:
     name: pip
-    version: 3.12
 
 build:
   requirementsPath: requirements.txt
-  useCache: true
 
 run:
   command: python bot.py
