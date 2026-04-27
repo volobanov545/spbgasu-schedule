@@ -22,22 +22,31 @@ jobs:
       - name: Install dependencies
         run: pip install beautifulsoup4 icalendar requests caldav playwright && playwright install-deps chromium && playwright install chromium
 
+      - name: Save old schedule
+        run: git show HEAD:schedule.ics > old_schedule.ics 2>/dev/null || touch old_schedule.ics
+
       - name: Parse schedule from portal
         env:
           PORTAL_LOGIN: ${{ secrets.PORTAL_LOGIN }}
           PORTAL_PASS:  ${{ secrets.PORTAL_PASS }}
         run: python parse_portal.py
 
-      - name: Upload debug artifacts
+      - name: Send notifications
+        env:
+          TG_TOKEN:   ${{ secrets.TG_TOKEN }}
+          TG_CHANNEL: ${{ secrets.TG_CHANNEL }}
+        run: python notify.py old_schedule.ics schedule.ics
+
+      - name: Commit debug screenshots
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug
-          path: |
-            debug_schedule.html
-            debug_schedule.png
-            debug_login.png
-            debug_after_login.png
+        run: |
+          git config user.name  "gitverse-actions"
+          git config user.email "actions@gitverse.ru"
+          git add -f debug_login.png debug_after_login.png 2>/dev/null || true
+          git diff --cached --quiet || (
+            git commit -m "debug: login screenshots" &&
+            git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main
+          )
 
       - name: Sync to Яндекс.Календарь
         env:
