@@ -39,6 +39,9 @@ jobs:
           PORTAL_PASS:  ${{ secrets.PORTAL_PASS }}
         run: python parse_journals.py
 
+      - name: Check network
+        run: curl -s --max-time 5 https://api.telegram.org || echo "api.telegram.org недоступен с runner'а"
+
       - name: Send notifications
         env:
           TG_TOKEN:    ${{ secrets.TG_TOKEN }}

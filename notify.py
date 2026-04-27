@@ -111,16 +111,19 @@ def _tg_send(chat_id: str, text: str, label: str):
     if not token or not chat_id:
         print(f"[NOTIFY] {label}: токен или chat_id не заданы, пропускаю")
         return
-    import urllib.request, urllib.parse, json
+    import urllib.request, urllib.parse
     url  = f"https://api.telegram.org/bot{token}/sendMessage"
     data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
     req  = urllib.request.Request(url, data=data)
-    resp = urllib.request.urlopen(req, timeout=15)
-    result = json.loads(resp.read())
-    if result.get("ok"):
-        print(f"[NOTIFY] {label}: отправлено")
-    else:
-        print(f"[NOTIFY] {label}: ошибка — {result}")
+    try:
+        resp   = urllib.request.urlopen(req, timeout=15)
+        result = json.loads(resp.read())
+        if result.get("ok"):
+            print(f"[NOTIFY] {label}: отправлено")
+        else:
+            print(f"[NOTIFY] {label}: ошибка API — {result}")
+    except Exception as e:
+        print(f"[NOTIFY] {label}: сетевая ошибка — {e}")
 
 
 def send_telegram(text: str):
@@ -201,12 +204,15 @@ def main():
     if len(sys.argv) >= 5:
         old_j = load_journal_state(sys.argv[3])
         new_j = load_journal_state(sys.argv[4])
-        jmsg = build_journal_diff_message(old_j, new_j)
-        if not jmsg:
-            print("[NOTIFY] Журналы не изменились")
+        if not old_j.get("attestations"):
+            print("[NOTIFY] Журналы: первый запуск, сохраняю baseline без уведомлений")
         else:
-            print("[NOTIFY] Найдены изменения в журналах, отправляю в личку...")
-            send_telegram_dm(jmsg)
+            jmsg = build_journal_diff_message(old_j, new_j)
+            if not jmsg:
+                print("[NOTIFY] Журналы не изменились")
+            else:
+                print("[NOTIFY] Найдены изменения в журналах, отправляю в личку...")
+                send_telegram_dm(jmsg)
 
 
 if __name__ == "__main__":
