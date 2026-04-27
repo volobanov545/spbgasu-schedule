@@ -2,8 +2,9 @@
 import asyncio
 import logging
 import os
+import re
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -52,6 +53,21 @@ YC_INSTRUCTION = (
 )
 
 
+BTN_STATS  = "📋 Аттестации"
+BTN_YC     = "📅 Яндекс.Календарь"
+BTN_USERS  = "👥 Пользователи"
+BTN_DELETE = "❌ Удалить аккаунт"
+KB_BTNS = {BTN_STATS, BTN_YC, BTN_USERS, BTN_DELETE}
+
+
+def reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
+    rows = [[KeyboardButton(BTN_STATS), KeyboardButton(BTN_YC)]]
+    if is_owner:
+        rows.append([KeyboardButton(BTN_USERS)])
+    rows.append([KeyboardButton(BTN_DELETE)])
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
 def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📋 Аттестации", callback_data="stats")],
@@ -79,9 +95,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         yc = "подключён ✅" if user["yandex_login"] else "не подключён"
         await update.message.reply_text(
             f"Привет! Ты зарегистрирован (логин: {user['login']}).\n"
-            f"Яндекс.Календарь: {yc}\n\n"
-            "Что хочешь сделать?",
-            reply_markup=main_menu(),
+            f"Яндекс.Календарь: {yc}",
+            reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID),
         )
         return ConversationHandler.END
     await update.message.reply_text(
@@ -363,7 +378,11 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         approve_user(tid)
         await query.edit_message_text(query.message.text + "\n\n✅ Одобрено")
         try:
-            await ctx.bot.send_message(chat_id=tid, text="✅ Твоя заявка одобрена! Напиши /start.")
+            await ctx.bot.send_message(
+                chat_id=tid,
+                text="✅ Твоя заявка одобрена! Можешь пользоваться ботом.",
+                reply_markup=reply_keyboard(tid == OWNER_ID),
+            )
         except Exception:
             pass
 
@@ -500,14 +519,16 @@ def main():
     init_db()
     app = Application.builder().token(TOKEN).build()
 
+    not_kb = ~filters.Regex("^(" + "|".join(re.escape(b) for b in KB_BTNS) + ")$")
+
     reg_handler = ConversationHandler(
         entry_points=[CommandHandler("start", cmd_start, filters=filters.ChatType.PRIVATE)],
         states={
-            WAIT_LOGIN:     [MessageHandler(filters.TEXT & ~filters.COMMAND, got_login)],
-            WAIT_PASSWORD:  [MessageHandler(filters.TEXT & ~filters.COMMAND, got_password)],
-            WAIT_YC_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc_choice)],
-            WAIT_YC_LOGIN:  [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc_login)],
-            WAIT_YC_PASS:   [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc_pass)],
+            WAIT_LOGIN:     [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_login)],
+            WAIT_PASSWORD:  [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_password)],
+            WAIT_YC_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_choice)],
+            WAIT_YC_LOGIN:  [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_login)],
+            WAIT_YC_PASS:   [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_pass)],
         },
         fallbacks=[CommandHandler("cancel", cmd_cancel)],
         allow_reentry=True,
@@ -519,8 +540,8 @@ def main():
             CallbackQueryHandler(cmd_connect_yandex, pattern="^connect_yandex$"),
         ],
         states={
-            WAIT_YC2_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc2_login)],
-            WAIT_YC2_PASS:  [MessageHandler(filters.TEXT & ~filters.COMMAND, got_yc2_pass)],
+            WAIT_YC2_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc2_login)],
+            WAIT_YC2_PASS:  [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc2_pass)],
         },
         fallbacks=[CommandHandler("cancel", cmd_cancel)],
     )
@@ -538,6 +559,12 @@ def main():
     app.add_handler(CommandHandler("remove", cmd_remove))
     app.add_handler(CommandHandler("sendhtml", cmd_sendhtml))
     app.add_handler(CommandHandler("sendpng", cmd_sendpng))
+
+    # Обработчики кнопок reply-клавиатуры
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_STATS)}$")  & filters.ChatType.PRIVATE, cmd_stats))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_YC)}$")     & filters.ChatType.PRIVATE, cmd_connect_yandex))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_USERS)}$")  & filters.ChatType.PRIVATE, cmd_users))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_DELETE)}$") & filters.ChatType.PRIVATE, cmd_unregister))
 
     log.info("Bot started")
     app.run_polling(drop_pending_updates=True)
