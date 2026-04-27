@@ -317,11 +317,22 @@ def _format_stats(data: dict) -> str:
 async def cmd_unregister(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query:
-        remove_user(query.from_user.id)
-        await query.message.reply_text("Аккаунт удалён.")
+        await query.answer()
+        send = query.message.reply_text
+        tid = query.from_user.id
     else:
-        remove_user(update.effective_user.id)
-        await update.message.reply_text("Аккаунт удалён.")
+        send = update.message.reply_text
+        tid = update.effective_user.id
+
+    user = get_user(tid)
+    cal_note = "\n📅 Календарь «СПбГАСУ» в Яндексе будет удалён." if (user and user.get("yandex_login")) else ""
+    await send(
+        f"⚠️ Удалить аккаунт? Все данные (логин, пароль, Яндекс) будут удалены.{cal_note}",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🗑 Да, удалить", callback_data="confirm_unregister"),
+            InlineKeyboardButton("↩️ Отмена", callback_data="cancel_action"),
+        ]]),
+    )
 
 
 # ─── Callback-кнопки (approve / deny / ban) ──────────────────────────────────
@@ -349,8 +360,18 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if data == "confirm_unregister":
         await query.answer()
-        remove_user(query.from_user.id)
-        await query.edit_message_text("Аккаунт удалён. Напиши /start чтобы зарегистрироваться снова.")
+        tid = query.from_user.id
+        user = get_user(tid)
+        cal_msg = ""
+        if user and user.get("yandex_login") and user.get("yandex_pass"):
+            try:
+                from sync_yandex import delete_yandex_calendar
+                deleted = await asyncio.to_thread(delete_yandex_calendar, user["yandex_login"], user["yandex_pass"])
+                cal_msg = " Календарь удалён ✓" if deleted else ""
+            except Exception as e:
+                log.warning("calendar delete error: %s", e)
+        remove_user(tid)
+        await query.edit_message_text(f"Аккаунт удалён.{cal_msg} Напиши /start чтобы зарегистрироваться снова.")
         return
 
     if data == "cancel_action":
@@ -365,6 +386,13 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("owner_remove:"):
         tid = int(data.split(":")[1])
+        user = get_user(tid)
+        if user and user.get("yandex_login") and user.get("yandex_pass"):
+            try:
+                from sync_yandex import delete_yandex_calendar
+                await asyncio.to_thread(delete_yandex_calendar, user["yandex_login"], user["yandex_pass"])
+            except Exception as e:
+                log.warning("calendar delete error for %s: %s", tid, e)
         remove_user(tid)
         await query.edit_message_text(query.message.text + "\n\n🗑 Удалён")
         try:
