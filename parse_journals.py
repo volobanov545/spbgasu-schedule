@@ -105,6 +105,34 @@ async def login(page, login: str = "", password: str = ""):
 
 # ─── Главная страница: аттестации и сводка посещаемости ──────────────────────
 
+def parse_student_name(html: str) -> str:
+    """
+    Извлекает фамилию студента из HTML страницы /lk/.
+    Портал Bitrix обычно показывает ФИО в профиле или приветственном блоке.
+    Возвращает первое слово (фамилию) или пустую строку если не нашли.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    # Ищем элементы, которые Bitrix использует для отображения имени пользователя
+    candidates = []
+    for el in soup.find_all(True):
+        cls = " ".join(el.get("class", []))
+        if re.search(r"user[-_]?name|personal[-_]?name|fio|profile[-_]?name|greeting", cls, re.I):
+            candidates.append(el.get_text(strip=True))
+    # Если не нашли по классу — ищем в тексте приветствия ("Здравствуйте, Иванов")
+    if not candidates:
+        text = soup.get_text(" ", strip=True)
+        m = re.search(r"(?:Здравствуйте|Добро пожаловать)[,!]?\s+([А-ЯЁ][а-яё]+)", text)
+        if m:
+            candidates.append(m.group(1))
+    for c in candidates:
+        words = c.split()
+        # Берём первое кириллическое слово длиннее 2 символов — скорее всего фамилия
+        for w in words:
+            if re.match(r'^[А-ЯЁа-яё]{3,}$', w):
+                return w.capitalize()
+    return ""
+
+
 def parse_main_page(html: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -358,7 +386,8 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
             _save_debug_html(html, f"debug_lk_{_safe_login(portal_login)}.html")
             await page.screenshot(path=str(DATA_DIR / f"debug_lk_{_safe_login(portal_login)}.png"), full_page=True)
             log.info("Скриншот сохранён: debug_lk_%s.png", portal_login)
-            main_data = parse_main_page(html)
+            main_data    = parse_main_page(html)
+            student_name = parse_student_name(html)
             await browser.close()
     finally:
         _browser_sem.release()
@@ -366,6 +395,7 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
         "stats":        main_data["stats"],
         "attestations": main_data["attestations"],
         "absences":     {},
+        "student_name": student_name,
     }
 
 

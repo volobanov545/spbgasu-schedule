@@ -75,7 +75,7 @@ from telegram.ext import (
 import caldav  # нужен только для _test_yandex — проверки подключения перед сохранением
 
 from db import (
-    init_db, add_user, set_yandex, clear_yandex,
+    init_db, add_user, set_yandex, set_student_name, clear_yandex,
     approve_user, ban_user, unban_user, remove_user,
     get_user, get_all_users,
 )
@@ -95,8 +95,8 @@ MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 # AsyncIOScheduler работает в том же event loop что и бот — не нужен отдельный поток.
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
-# Состояния ConversationHandler регистрации (0–5)
-WAIT_LOGIN, WAIT_STUDENT_NAME, WAIT_PASSWORD, WAIT_YC_CHOICE, WAIT_YC_LOGIN, WAIT_YC_PASS = range(6)
+# Состояния ConversationHandler регистрации (0–4)
+WAIT_LOGIN, WAIT_PASSWORD, WAIT_YC_CHOICE, WAIT_YC_LOGIN, WAIT_YC_PASS = range(5)
 
 # Состояния ConversationHandler подключения Яндекса после регистрации (10–11)
 # Намеренно начинаем с 10, чтобы не пересекаться с состояниями reg_handler
@@ -295,23 +295,7 @@ async def got_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return WAIT_LOGIN
     ctx.user_data["login"] = login
     await update.message.reply_text(
-        "📝 <b>Регистрация — шаг 2 из 4</b>\n\n"
-        "Введи фамилию как она написана в журнале посещаемости\n"
-        "(например: <code>Лобанов</code>):",
-        parse_mode="HTML",
-    )
-    return WAIT_STUDENT_NAME
-
-
-async def got_student_name(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Сохраняем фамилию — используется для поиска строки в журнале посещаемости."""
-    name = update.message.text.strip()
-    if not name or len(name) > 100:
-        await update.message.reply_text("❌ Введи фамилию (до 100 символов). Попробуй ещё раз:")
-        return WAIT_STUDENT_NAME
-    ctx.user_data["student_name"] = name
-    await update.message.reply_text(
-        "📝 <b>Регистрация — шаг 3 из 4</b>\n\n"
+        "📝 <b>Регистрация — шаг 2 из 3</b>\n\n"
         "Введи пароль от портала:",
         parse_mode="HTML",
     )
@@ -334,7 +318,7 @@ async def got_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return WAIT_PASSWORD
     ctx.user_data["password"] = password
     await update.message.reply_text(
-        "📝 <b>Регистрация — шаг 4 из 4</b>\n\n"
+        "📝 <b>Регистрация — шаг 3 из 3</b>\n\n"
         "Хочешь подключить Яндекс.Календарь?\n"
         "Расписание будет автоматически появляться в твоём календаре.",
         parse_mode="HTML",
@@ -404,15 +388,14 @@ async def _finish_registration(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data.pop() — очищаем временные данные после использования,
     чтобы не оставлять пароли в памяти дольше необходимого.
     """
-    tid          = update.effective_user.id
-    login        = ctx.user_data.pop("login", "")
-    student_name = ctx.user_data.pop("student_name", "")
-    password     = ctx.user_data.pop("password", "")
-    yc_login     = ctx.user_data.pop("yc_login", None)
-    yc_pass      = ctx.user_data.pop("yc_pass", None)
-    username     = update.effective_user.username or update.effective_user.first_name or str(tid)
+    tid      = update.effective_user.id
+    login    = ctx.user_data.pop("login", "")
+    password = ctx.user_data.pop("password", "")
+    yc_login = ctx.user_data.pop("yc_login", None)
+    yc_pass  = ctx.user_data.pop("yc_pass", None)
+    username = update.effective_user.username or update.effective_user.first_name or str(tid)
 
-    add_user(tid, login, password, student_name)
+    add_user(tid, login, password)
     if yc_login and yc_pass:
         set_yandex(tid, yc_login, yc_pass)
 
@@ -431,7 +414,6 @@ async def _finish_registration(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"🔔 Новая заявка на регистрацию:\n"
             f"Пользователь: @{username} (id: {tid})\n"
             f"Логин портала: {login}\n"
-            f"Фамилия: {student_name or '—'}\n"
             f"{yc_status}"
         ),
         reply_markup=kb,
@@ -579,6 +561,13 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         log.exception("stats error for %s", user["login"])
         await loading_msg.edit_text(f"❌ Ошибка при загрузке: {e}")
         return
+
+    # Автосохраняем имя студента с портала если ещё не сохранено
+    scraped_name = data.get("student_name", "")
+    if scraped_name and not user.get("student_name"):
+        from db import set_student_name
+        set_student_name(tid, scraped_name)
+        log.info("student_name автосохранён: %s → %s", user["login"], scraped_name)
 
     refresh_kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔄 Обновить", callback_data="refresh_stats"),
@@ -1200,12 +1189,11 @@ def main():
             CallbackQueryHandler(_start_register, pattern="^register$"),
         ],
         states={
-            WAIT_LOGIN:         [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_login)],
-            WAIT_STUDENT_NAME:  [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_student_name)],
-            WAIT_PASSWORD:      [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_password)],
-            WAIT_YC_CHOICE:     [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_choice)],
-            WAIT_YC_LOGIN:      [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_login)],
-            WAIT_YC_PASS:       [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_pass)],
+            WAIT_LOGIN:     [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_login)],
+            WAIT_PASSWORD:  [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_password)],
+            WAIT_YC_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_choice)],
+            WAIT_YC_LOGIN:  [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_login)],
+            WAIT_YC_PASS:   [MessageHandler(filters.TEXT & ~filters.COMMAND & not_kb, got_yc_pass)],
         },
         fallbacks=[CommandHandler("cancel", cmd_cancel)],
         allow_reentry=True,
