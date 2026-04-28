@@ -27,21 +27,27 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            telegram_id      INTEGER PRIMARY KEY,
-            portal_login     TEXT NOT NULL,
-            portal_pass_enc  TEXT NOT NULL,
-            approved         INTEGER NOT NULL DEFAULT 0,
-            banned           INTEGER NOT NULL DEFAULT 0,
-            yandex_login     TEXT,
-            yandex_pass_enc  TEXT,
-            student_name     TEXT
+            telegram_id       INTEGER PRIMARY KEY,
+            portal_login      TEXT NOT NULL,
+            portal_pass_enc   TEXT NOT NULL,
+            approved          INTEGER NOT NULL DEFAULT 0,
+            banned            INTEGER NOT NULL DEFAULT 0,
+            yandex_login      TEXT,
+            yandex_pass_enc   TEXT,
+            student_name      TEXT,
+            attestations_json TEXT,
+            reminder_minutes  INTEGER NOT NULL DEFAULT 0,
+            quiet_until_date  TEXT
         )
     """)
     for col, definition in [
-        ("yandex_login",    "TEXT"),
-        ("yandex_pass_enc", "TEXT"),
-        ("banned",          "INTEGER NOT NULL DEFAULT 0"),
-        ("student_name",    "TEXT"),
+        ("yandex_login",      "TEXT"),
+        ("yandex_pass_enc",   "TEXT"),
+        ("banned",            "INTEGER NOT NULL DEFAULT 0"),
+        ("student_name",      "TEXT"),
+        ("attestations_json", "TEXT"),
+        ("reminder_minutes",  "INTEGER NOT NULL DEFAULT 0"),
+        ("quiet_until_date",  "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
@@ -104,6 +110,27 @@ def set_student_name(telegram_id: int, student_name: str):
     conn.close()
 
 
+def set_attestations(telegram_id: int, json_str: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE users SET attestations_json=? WHERE telegram_id=?", (json_str, telegram_id))
+    conn.commit()
+    conn.close()
+
+
+def set_reminder_minutes(telegram_id: int, minutes: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE users SET reminder_minutes=? WHERE telegram_id=?", (minutes, telegram_id))
+    conn.commit()
+    conn.close()
+
+
+def set_quiet_until(telegram_id: int, date_str: str | None):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE users SET quiet_until_date=? WHERE telegram_id=?", (date_str, telegram_id))
+    conn.commit()
+    conn.close()
+
+
 def clear_yandex(telegram_id: int):
     conn = sqlite3.connect(DB_PATH)
     conn.execute("UPDATE users SET yandex_login=NULL, yandex_pass_enc=NULL WHERE telegram_id=?", (telegram_id,))
@@ -121,40 +148,49 @@ def remove_user(telegram_id: int):
 def get_user(telegram_id: int) -> dict | None:
     conn = sqlite3.connect(DB_PATH)
     row = conn.execute(
-        "SELECT portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc, student_name FROM users WHERE telegram_id=?",
+        """SELECT portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc,
+                  student_name, attestations_json, reminder_minutes, quiet_until_date
+           FROM users WHERE telegram_id=?""",
         (telegram_id,),
     ).fetchone()
     conn.close()
     if not row:
         return None
-    login, enc, approved, banned, ylogin, yenc, sname = row
+    login, enc, approved, banned, ylogin, yenc, sname, att_json, rem_min, quiet_date = row
     return {
-        "login":         login,
-        "password":      _dec(enc),
-        "approved":      bool(approved),
-        "banned":        bool(banned),
-        "yandex_login":  ylogin,
-        "yandex_pass":   _dec(yenc) if yenc else None,
-        "student_name":  sname or "",
+        "login":             login,
+        "password":          _dec(enc),
+        "approved":          bool(approved),
+        "banned":            bool(banned),
+        "yandex_login":      ylogin,
+        "yandex_pass":       _dec(yenc) if yenc else None,
+        "student_name":      sname or "",
+        "attestations_json": att_json,
+        "reminder_minutes":  rem_min or 0,
+        "quiet_until_date":  quiet_date,
     }
 
 
 def get_all_users() -> list[dict]:
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(
-        "SELECT telegram_id, portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc, student_name FROM users"
+        """SELECT telegram_id, portal_login, portal_pass_enc, approved, banned, yandex_login,
+                  yandex_pass_enc, student_name, reminder_minutes, quiet_until_date
+           FROM users"""
     ).fetchall()
     conn.close()
     return [
         {
-            "telegram_id":  tid,
-            "login":        login,
-            "password":     _dec(enc),
-            "approved":     bool(approved),
-            "banned":       bool(banned),
-            "yandex_login": ylogin,
-            "yandex_pass":  _dec(yenc) if yenc else None,
-            "student_name": sname or "",
+            "telegram_id":     tid,
+            "login":           login,
+            "password":        _dec(enc),
+            "approved":        bool(approved),
+            "banned":          bool(banned),
+            "yandex_login":    ylogin,
+            "yandex_pass":     _dec(yenc) if yenc else None,
+            "student_name":    sname or "",
+            "reminder_minutes": rem_min or 0,
+            "quiet_until_date": quiet_date,
         }
-        for tid, login, enc, approved, banned, ylogin, yenc, sname in rows
+        for tid, login, enc, approved, banned, ylogin, yenc, sname, rem_min, quiet_date in rows
     ]

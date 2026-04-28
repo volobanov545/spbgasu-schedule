@@ -30,6 +30,7 @@ Telegram-бот GASUCHKA (@gasu4ka_bot).
 
 import asyncio
 import html as html_mod
+import json
 import logging
 import os
 import re
@@ -72,56 +73,51 @@ from telegram.ext import (
     ContextTypes,
 )
 
-import caldav  # нужен только для _test_yandex — проверки подключения перед сохранением
+import caldav
 
 from db import (
-    init_db, add_user, set_yandex, set_student_name, clear_yandex,
+    init_db, add_user, set_yandex, set_student_name, set_attestations,
+    set_reminder_minutes, set_quiet_until, clear_yandex,
     approve_user, ban_user, unban_user, remove_user,
     get_user, get_all_users,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-# httpx по умолчанию логирует полные URL включая токен бота — подавляем до WARNING
 logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
 TOKEN      = os.environ["TG_TOKEN"]
-OWNER_ID   = int(os.environ["TG_OWNER_ID"])   # 796071683 — только он видит /users, /approve и пр.
-TG_CHANNEL = os.environ.get("TG_CHANNEL", "") # @gasu4ka — канал для расписания и напоминаний
+OWNER_ID   = int(os.environ["TG_OWNER_ID"])
+TG_CHANNEL = os.environ.get("TG_CHANNEL", "")
 
 MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
-# Глобальный планировщик задач (утреннее расписание + напоминания).
-# AsyncIOScheduler работает в том же event loop что и бот — не нужен отдельный поток.
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
 # Состояния ConversationHandler регистрации (0–4)
 WAIT_LOGIN, WAIT_PASSWORD, WAIT_YC_CHOICE, WAIT_YC_LOGIN, WAIT_YC_PASS = range(5)
 
 # Состояния ConversationHandler подключения Яндекса после регистрации (10–11)
-# Намеренно начинаем с 10, чтобы не пересекаться с состояниями reg_handler
 WAIT_YC2_LOGIN, WAIT_YC2_PASS = range(10, 12)
+
+# Цикл времени напоминания: 0 (выкл) → 15 → 30 → 60 → 0
+REMINDER_CYCLE = {0: 15, 15: 30, 30: 60, 60: 0}
 
 
 # ─── Инициализация при старте бота ────────────────────────────────────────────
 
 async def _post_init(app):
-    """
-    Вызывается один раз после запуска бота (до начала polling).
-    Настраивает:
-      - команды в меню (≡) — видны пользователям в BotFather-style списке
-      - MenuButtonCommands — заменяет скрепку в поле ввода на кнопку «≡»,
-        которая открывает список команд ДАЖЕ В ПУСТОМ ЧАТЕ
-      - описание бота — текст, который видит пользователь при первом открытии
-        или после очистки истории чата
-    """
     await app.bot.set_my_commands([
-        BotCommand("start",  "Главное меню"),
-        BotCommand("stats",  "Аттестации и посещаемость"),
-        BotCommand("cancel", "Отменить"),
+        BotCommand("start",    "Главное меню"),
+        BotCommand("stats",    "Аттестации и посещаемость"),
+        BotCommand("next",     "Следующая пара"),
+        BotCommand("today",    "Расписание на сегодня"),
+        BotCommand("week",     "Расписание на неделю"),
+        BotCommand("quiet",    "Тихий режим на сегодня"),
+        BotCommand("feedback", "Написать администратору"),
+        BotCommand("help",     "Список команд"),
+        BotCommand("cancel",   "Отменить"),
     ])
-    # MenuButtonCommands — стандартная кнопка-гамбургер ≡ рядом с полем ввода.
-    # Без этого вызова там была бы скрепка для вложений.
     await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
     await app.bot.set_my_description(
         "🎓 GASUCHKA — мониторинг учёбы в СПбГАСУ\n\n"
@@ -132,46 +128,32 @@ async def _post_init(app):
     )
     await app.bot.set_my_short_description("Расписание и посещаемость СПбГАСУ")
 
-    # Ежедневные задачи через APScheduler.
-    # В 08:00 — отправляем расписание на сегодня в канал.
-    # В 07:50 — планируем напоминания за 30 мин до каждой пары.
     scheduler.add_job(morning_schedule,         "cron", hour=8, minute=0,  args=[app])
     scheduler.add_job(schedule_daily_reminders, "cron", hour=7, minute=50, args=[app])
     scheduler.start()
-    # Если бот перезапустился в течение дня — сразу ставим напоминания на оставшиеся пары
     await schedule_daily_reminders(app)
     log.info("APScheduler запущен")
 
 
 async def _post_shutdown(app):
-    """Корректно останавливаем планировщик при выключении бота."""
     scheduler.shutdown(wait=False)
 
 
 # ─── Вспомогательные функции ──────────────────────────────────────────────────
 
 def _test_yandex(ylogin: str, ypass: str) -> str | None:
-    """
-    Синхронная проверка подключения к Яндекс.Календарю через CalDAV.
-    Вызывается через asyncio.to_thread() чтобы не блокировать event loop.
-    Возвращает None если всё ОК, иначе текст ошибки.
-
-    Яндекс CalDAV требует пароль ПРИЛОЖЕНИЯ (16 символов из id.yandex.ru),
-    а НЕ основной пароль аккаунта — это важно объяснять пользователям.
-    """
     try:
         client = caldav.DAVClient(
             url="https://caldav.yandex.ru",
             username=f"{ylogin}@yandex.ru",
             password=ypass,
         )
-        client.principal()  # делает реальный HTTP-запрос, проверяет авторизацию
+        client.principal()
         return None
     except Exception as e:
         return str(e)
 
 
-# Инструкция по получению пароля приложения — показывается при каждом запросе ЯК
 YC_INSTRUCTION = (
     "📅 Чтобы подключить Яндекс.Календарь:\n\n"
     "1. Открой id.yandex.ru\n"
@@ -181,33 +163,20 @@ YC_INSTRUCTION = (
     "Введи свой логин Яндекса (без @yandex.ru):"
 )
 
-# Тексты кнопок постоянной клавиатуры — вынесены в константы,
-# потому что они же используются в фильтре not_kb (см. main()).
-# Если изменить текст кнопки здесь — фильтр и обработчик обновятся автоматически.
 BTN_STATS    = "📋 Аттестации"
-BTN_USERS    = "👥 Пользователи"   # показывается только OWNER_ID
+BTN_SCHEDULE = "📅 Расписание"
 BTN_SETTINGS = "⚙️ Настройки"
-KB_BTNS = {BTN_STATS, BTN_USERS, BTN_SETTINGS}  # множество для быстрой проверки в not_kb
+BTN_USERS    = "👥 Пользователи"
+KB_BTNS = {BTN_STATS, BTN_SCHEDULE, BTN_SETTINGS, BTN_USERS}
 
 
 def reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
-    """
-    Постоянная клавиатура снизу экрана для одобренных пользователей.
-    resize_keyboard=True — кнопки компактные, не занимают пол-экрана.
-    input_field_placeholder — подсказка в поле ввода пока клавиатура активна.
-    Кнопка «👥 Пользователи» добавляется только владельцу (OWNER_ID).
-    Для обычного: одна строка [Аттестации | Настройки].
-    Для овнера: [Аттестации | Пользователи] / [Настройки].
-    """
+    row1 = [KeyboardButton(BTN_STATS), KeyboardButton(BTN_SCHEDULE)]
+    row2 = [KeyboardButton(BTN_SETTINGS)]
     if is_owner:
-        rows = [
-            [KeyboardButton(BTN_STATS), KeyboardButton(BTN_SETTINGS)],
-            [KeyboardButton(BTN_USERS)],
-        ]
-    else:
-        rows = [[KeyboardButton(BTN_STATS), KeyboardButton(BTN_SETTINGS)]]
+        row2.append(KeyboardButton(BTN_USERS))
     return ReplyKeyboardMarkup(
-        rows,
+        [row1, row2],
         resize_keyboard=True,
         input_field_placeholder="Выбери действие...",
     )
@@ -216,21 +185,8 @@ def reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
 # ─── Регистрация (ConversationHandler) ────────────────────────────────────────
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Точка входа: /start (только в личном чате).
-    Три сценария:
-      1. Пользователь в БД + одобрен → показываем меню с reply_keyboard
-      2. Пользователь в БД, но не одобрен / забанен → сообщение о статусе
-      3. Пользователя нет → приветственный экран с кнопкой «Зарегистрироваться»
-
-    ВАЖНО: возвращаем ConversationHandler.END во всех ветках кроме новой регистрации,
-    потому что cmd_start — entry_point ConversationHandler. Если вернуть END,
-    разговор не начнётся и пользователь не попадёт в состояние WAIT_LOGIN.
-    Для новых пользователей тоже возвращаем END — разговор начинается через
-    отдельный callback «register» → _start_register, который возвращает WAIT_LOGIN.
-    """
     if update.effective_chat.type != "private":
-        return  # игнорируем групповые чаты
+        return
 
     user = get_user(update.effective_user.id)
 
@@ -247,16 +203,16 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             return ConversationHandler.END
         yc = "✅ подключён" if user["yandex_login"] else "не подключён"
+        name_line = f"\n👤 {html_mod.escape(user['student_name'])}" if user.get("student_name") else ""
         await update.message.reply_text(
             "🎓 <b>GASUCHKA</b>\n\n"
-            f"👤 <code>{html_mod.escape(user['login'])}</code>\n"
+            f"<code>{html_mod.escape(user['login'])}</code>{name_line}\n"
             f"📅 Яндекс.Календарь: {yc}",
             parse_mode="HTML",
             reply_markup=reply_keyboard(update.effective_user.id == OWNER_ID),
         )
         return ConversationHandler.END
 
-    # Новый пользователь — показываем inline-кнопку вместо слепого «введи логин»
     await update.message.reply_text(
         "🎓 <b>GASUCHKA</b>\n\n"
         "Мониторинг расписания и посещаемости СПбГАСУ.\n"
@@ -270,12 +226,6 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def _start_register(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Entry point ConversationHandler через inline-кнопку «Зарегистрироваться».
-    Срабатывает на callback_data="register".
-    query.answer() — обязательно для inline-кнопок, убирает «часики» у кнопки.
-    Возвращает WAIT_LOGIN — следующее сообщение пользователя попадёт в got_login().
-    """
     query = update.callback_query
     await query.answer()
     await query.message.reply_text(
@@ -288,7 +238,6 @@ async def _start_register(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Сохраняем логин в ctx.user_data (временное хранилище на время диалога)."""
     login = update.message.text.strip()
     if not login or len(login) > 50:
         await update.message.reply_text("❌ Логин должен быть от 1 до 50 символов. Попробуй ещё раз:")
@@ -303,16 +252,11 @@ async def got_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Сохраняем пароль, удаляем сообщение с ним — пароль не должен висеть в истории.
-    one_time_keyboard=True — клавиатура исчезает сразу после нажатия.
-    Кнопки «✅ Да» / «❌ Нет» избавляют от необходимости что-то печатать.
-    """
     password = update.message.text.strip()
     try:
         await update.message.delete()
     except Exception:
-        pass  # нет прав на удаление — не критично
+        pass
     if not password or len(password) > 256:
         await update.message.reply_text("❌ Пароль должен быть от 1 до 256 символов. Попробуй ещё раз:")
         return WAIT_PASSWORD
@@ -333,7 +277,6 @@ async def got_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc_choice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Разветвление: да → запрашиваем данные Яндекса, нет → сразу завершаем регистрацию."""
     if update.message.text.strip().lower() in ("да", "yes", "y", "д", "✅ да"):
         await update.message.reply_text(YC_INSTRUCTION)
         return WAIT_YC_LOGIN
@@ -351,13 +294,6 @@ async def got_yc_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Проверяем CalDAV перед сохранением — не хочется хранить заведомо битые данные.
-    asyncio.to_thread() нужен потому что caldav делает синхронные HTTP-запросы,
-    а мы не должны блокировать async event loop бота.
-    При ошибке — возвращаем пользователя на ввод логина (он мог ошибиться в нём).
-    Пароль приложения удаляем из чата — он не должен висеть в истории.
-    """
     yc_login = ctx.user_data.get("yc_login", "")
     yc_pass  = update.message.text.strip()
     try:
@@ -378,16 +314,6 @@ async def got_yc_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def _finish_registration(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Финальный шаг регистрации:
-      1. Сохраняем логин/пароль портала в БД (пароль шифруется Fernet в db.py)
-      2. Сохраняем данные Яндекса если были введены
-      3. Уведомляем пользователя — он ждёт одобрения
-      4. Отправляем владельцу карточку заявки с кнопками одобрить/отклонить
-
-    ctx.user_data.pop() — очищаем временные данные после использования,
-    чтобы не оставлять пароли в памяти дольше необходимого.
-    """
     tid      = update.effective_user.id
     login    = ctx.user_data.pop("login", "")
     password = ctx.user_data.pop("password", "")
@@ -422,7 +348,6 @@ async def _finish_registration(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Экстренный выход из любого ConversationHandler. Очищаем user_data."""
     ctx.user_data.clear()
     await update.message.reply_text("Отменено.")
     return ConversationHandler.END
@@ -431,16 +356,6 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ─── Яндекс.Календарь (отдельный ConversationHandler) ────────────────────────
 
 async def cmd_connect_yandex(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Entry point yc_handler — подключение/обновление Яндекс.Календаря уже
-    зарегистрированным пользователем (не в процессе регистрации).
-    Вызывается двумя способами:
-      - callback_data="connect_yandex" из кнопки «Подключить ЯК» в настройках
-      - командой /connect_yandex
-
-    Если ЯК уже подключён — предлагаем обновить пароль приложения
-    (они протухают или пользователь мог его пересоздать).
-    """
     if update.effective_chat.type != "private":
         return
     query = update.callback_query
@@ -474,12 +389,6 @@ async def got_yc2_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc2_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Проверяем CalDAV и сохраняем. После подключения отправляем reply_keyboard —
-    это нужно чтобы клавиатура обновилась (хотя визуально она не меняется,
-    отправка гарантирует что она точно есть у пользователя).
-    Пароль приложения удаляем из чата.
-    """
     yc_login = ctx.user_data.get("yc_login", "")
     yc_pass  = update.message.text.strip()
     try:
@@ -507,24 +416,6 @@ async def got_yc2_pass(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ─── Статистика ───────────────────────────────────────────────────────────────
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Основная функция бота — парсит портал и выводит аттестации + посещаемость.
-
-    Принимает апдейты двух типов:
-      - Message (кнопка «📋 Аттестации» или команда /stats)
-      - CallbackQuery (inline-кнопка "stats" из старых меню)
-
-    parse_lk_quick() запускает Playwright, логинится на портал и парсит /lk/.
-    Работает ~20 секунд — браузер, логин, ожидание Vue-компонента.
-
-    Портал: Bitrix CMS + Vue SPA. После Bitrix-логина на /auth/ нужно перейти
-    на /lk/ — только тогда Vue подхватывает сессию. Сессия НЕ кешируется —
-    всегда делаем свежий логин, иначе протухшие куки вызывают показ формы
-    логина вместо дашборда, и аттестации не парсятся.
-
-    После получения данных — тихая синхронизация с Яндекс.Календарём.
-    Сообщение об успехе не показываем — только об ошибке авторизации.
-    """
     query = update.callback_query
     if query:
         send = query.message.reply_text
@@ -546,12 +437,7 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await send("⏳ Твоя заявка ещё не подтверждена администратором.")
         return
 
-    # send_chat_action показывает «печатает...» в шапке чата пока грузятся данные.
-    # Telegram не поддерживает кастомные тексты action — только системные варианты.
-    # ChatAction.TYPING — единственный подходящий для «готовлю ответ».
     await ctx.bot.send_chat_action(chat_id=tid, action=ChatAction.TYPING)
-
-    # Отправляем «загружаю» и сохраняем ссылку — потом отредактируем вместо нового сообщения.
     loading_msg = await send("⏳ Загружаю данные с портала, подожди ~20 сек...")
     try:
         from parse_journals import parse_lk_quick
@@ -565,21 +451,29 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Автосохраняем имя студента с портала если ещё не сохранено
     scraped_name = data.get("student_name", "")
     if scraped_name and not user.get("student_name"):
-        from db import set_student_name
         set_student_name(tid, scraped_name)
         log.info("student_name автосохранён: %s → %s", user["login"], scraped_name)
+
+    # Уведомление об изменениях в аттестациях
+    current_att = data.get("attestations", {})
+    if user.get("attestations_json"):
+        try:
+            old_att = json.loads(user["attestations_json"])
+            changes = _compare_attestations(old_att, current_att)
+            if changes:
+                await ctx.bot.send_message(chat_id=tid, text=changes, parse_mode="HTML")
+        except Exception:
+            pass
+    set_attestations(tid, json.dumps(current_att, ensure_ascii=False))
 
     refresh_kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔄 Обновить", callback_data="refresh_stats"),
     ]])
     await loading_msg.edit_text(text, parse_mode="HTML", reply_markup=refresh_kb)
 
-    # Синхронизация Яндекс.Календаря — тихо, без сообщения об успехе.
-    # Если пароль протух — сообщаем и просим обновить в настройках.
     if user["yandex_login"] and user["yandex_pass"]:
         try:
             from sync_yandex import sync_calendar
-            from pathlib import Path
             ics = Path(__file__).parent / "schedule.ics"
             await asyncio.to_thread(sync_calendar, user["yandex_login"], user["yandex_pass"], ics)
         except Exception as e:
@@ -591,7 +485,6 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 def _fmt_grade(g: str) -> str:
-    """Форматирует оценку аттестации с эмодзи-индикатором."""
     if not g or g == "—":
         return "⏳ —"
     if g.upper() in ("Н/А", "НА", "Н"):
@@ -599,16 +492,31 @@ def _fmt_grade(g: str) -> str:
     return f"✅ {g}"
 
 
+def _compare_attestations(old: dict, new: dict) -> str:
+    lines = []
+    for subj, marks in new.items():
+        old_marks = old.get(subj, {})
+        for att_key, att_label in (("att1", "1-я"), ("att2", "2-я")):
+            old_val = old_marks.get(att_key) or "—"
+            new_val = marks.get(att_key) or "—"
+            if old_val == new_val:
+                continue
+            if old_val == "—":
+                lines.append(
+                    f"📋 <b>{subj}</b>\n"
+                    f"  {att_label} аттестация — {_fmt_grade(new_val)}"
+                )
+            else:
+                lines.append(
+                    f"📋 <b>{subj}</b>\n"
+                    f"  {att_label} аттестация: {_fmt_grade(old_val)} → {_fmt_grade(new_val)}"
+                )
+    if not lines:
+        return ""
+    return "🔔 <b>Изменения в аттестациях</b>\n\n" + "\n\n".join(lines)
+
+
 def _format_stats(data: dict) -> str:
-    """
-    Форматирует словарь из parse_lk_quick() в HTML для Telegram.
-    data = {
-        "stats": {"total_classes": int, "present_pct": float, "absent_pct": float, ...},
-        "attestations": {"Предмет": {"att1": "А", "att2": "—"}, ...},
-        "absences": {}  # в quick-режиме всегда пустой — журналы не обходим
-    }
-    Оценки: А → ✅, Н/А → ❌, — → ⏳ (ещё не выставлена).
-    """
     lines = []
 
     stats = data.get("stats", {})
@@ -640,16 +548,11 @@ def _format_stats(data: dict) -> str:
 
 # ─── Расписание: парсинг ICS + утреннее сообщение + напоминания ──────────────
 
-ICS_URL = "https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/schedule.ics"
-DAYS_RU = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+ICS_URL  = "https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch/main/schedule.ics"
+DAYS_RU  = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
 
 
 def _get_lessons_for_date(target_date: date) -> list[dict]:
-    """
-    Читает schedule.ics из локального файла (бот берёт его из репо при деплое).
-    Если файл не найден — скачивает актуальную версию с GitVerse.
-    Возвращает список пар на указанную дату, отсортированных по времени.
-    """
     ics_path = Path(__file__).parent / "schedule.ics"
     if ics_path.exists():
         raw = ics_path.read_bytes()
@@ -666,7 +569,6 @@ def _get_lessons_for_date(target_date: date) -> list[dict]:
         if not dtstart:
             continue
         dt = dtstart.dt
-        # dt может быть datetime или date — обрабатываем оба варианта
         if isinstance(dt, datetime):
             dt          = dt.replace(tzinfo=MOSCOW_TZ) if dt.tzinfo is None else dt.astimezone(MOSCOW_TZ)
             lesson_date = dt.date()
@@ -700,7 +602,6 @@ def _get_lessons_for_date(target_date: date) -> list[dict]:
 
 
 def _format_day_schedule(target_date: date, lessons: list[dict]) -> str:
-    """Форматирует список пар дня в HTML для отправки в канал."""
     day_name = DAYS_RU[target_date.weekday()]
     text = f"📅 <b>Расписание на {day_name}, {target_date.strftime('%d.%m')}</b>\n\n"
     for i, l in enumerate(lessons, 1):
@@ -717,11 +618,6 @@ def _format_day_schedule(target_date: date, lessons: list[dict]) -> str:
 
 
 async def morning_schedule(app):
-    """
-    Cron-задача в 08:00 МСК — отправляет расписание на сегодня в канал @gasu4ka.
-    Если пар нет (выходной, каникулы) — ничего не отправляем, не спамим.
-    TG_CHANNEL должен быть задан в переменных окружения Amvera.
-    """
     if not TG_CHANNEL:
         log.warning("TG_CHANNEL не задан — утреннее расписание не отправлено")
         return
@@ -732,6 +628,12 @@ async def morning_schedule(app):
         log.error("Ошибка чтения расписания: %s", e)
         return
     if not lessons:
+        await app.bot.send_message(
+            chat_id=TG_CHANNEL,
+            text="🌅 Сегодня пар нет",
+            parse_mode="HTML",
+        )
+        log.info("Сегодня пар нет — отправлено в канал")
         return
     await app.bot.send_message(
         chat_id=TG_CHANNEL,
@@ -742,7 +644,7 @@ async def morning_schedule(app):
 
 
 async def send_lesson_reminder(app, lesson: dict):
-    """Отправляет напоминание за 30 мин до пары в канал."""
+    """Напоминание за 30 мин до пары в канал."""
     if not TG_CHANNEL:
         return
     time_s = lesson["dtstart"].strftime("%H:%M")
@@ -755,13 +657,27 @@ async def send_lesson_reminder(app, lesson: dict):
     await app.bot.send_message(chat_id=TG_CHANNEL, text=text, parse_mode="HTML")
 
 
+async def send_lesson_reminder_dm(app, lesson: dict, telegram_id: int, minutes: int):
+    """Персональное напоминание в DM пользователю за N минут до пары."""
+    user = get_user(telegram_id)
+    if not user or user.get("banned"):
+        return
+    if user.get("quiet_until_date") == date.today().isoformat():
+        return
+    time_s = lesson["dtstart"].strftime("%H:%M")
+    time_e = lesson["dtend"].strftime("%H:%M")
+    text   = f"⏰ Через {minutes} мин\n\n📚 {lesson['summary']}\n🕐 {time_s}–{time_e}"
+    if lesson["location"]:
+        text += f"  ·  🚪 {lesson['location']}"
+    if lesson["description"]:
+        text += f"\n👤 {lesson['description']}"
+    try:
+        await app.bot.send_message(chat_id=telegram_id, text=text)
+    except Exception as e:
+        log.warning("DM reminder error for %s: %s", telegram_id, e)
+
+
 async def schedule_daily_reminders(app):
-    """
-    Cron-задача в 07:50 МСК (и при старте бота) — планирует APScheduler-джобы
-    типа 'date' за 30 мин до каждой пары сегодняшнего дня.
-    replace_existing=True — безопасно при повторном вызове (напр. после рестарта).
-    Пары у которых remind_dt уже в прошлом — пропускаем.
-    """
     if not TG_CHANNEL:
         return
     today = date.today()
@@ -772,6 +688,8 @@ async def schedule_daily_reminders(app):
         return
     now       = datetime.now(MOSCOW_TZ)
     scheduled = 0
+
+    # Напоминание в канал за 30 мин
     for lesson in lessons:
         remind_dt = lesson["dtstart"] - timedelta(minutes=30)
         if remind_dt > now:
@@ -784,51 +702,197 @@ async def schedule_daily_reminders(app):
                 replace_existing=True,
             )
             scheduled += 1
+
+    # Персональные DM-напоминания
+    users = get_all_users()
+    for u in users:
+        rm = u.get("reminder_minutes", 0)
+        if not rm or not u["approved"] or u.get("banned"):
+            continue
+        for lesson in lessons:
+            remind_dt = lesson["dtstart"] - timedelta(minutes=rm)
+            if remind_dt > now:
+                scheduler.add_job(
+                    send_lesson_reminder_dm,
+                    "date",
+                    run_date=remind_dt,
+                    args=[app, lesson, u["telegram_id"], rm],
+                    id=f"reminder_dm_{lesson['uid']}_{u['telegram_id']}",
+                    replace_existing=True,
+                )
+
     if scheduled:
-        log.info("Запланировано напоминаний: %d", scheduled)
+        log.info("Запланировано напоминаний в канал: %d", scheduled)
 
 
-# ─── Настройки ───────────────────────────────────────────────────────────────
+# ─── Команды расписания ───────────────────────────────────────────────────────
 
-async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Открывается по кнопке «⚙️ Настройки» из reply_keyboard.
-    Показывает inline-меню с двумя действиями:
-      - Подключить / Отключить Яндекс.Календарь (кнопка меняется в зависимости от статуса)
-      - Удалить аккаунт (спрятано сюда, чтобы не торчало на главном экране)
-
-    «Отключить Яндекс» — удаляет Calendar «СПбГАСУ» из Яндекса и очищает данные в БД.
-    «Удалить аккаунт» — ведёт к confirm_unregister, который тоже удалит Calendar.
-    """
+async def cmd_schedule_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Кнопка «📅 Расписание» — открывает inline-меню."""
     if update.effective_chat.type != "private":
         return
     user = get_user(update.effective_user.id)
     if not user or not user["approved"] or user.get("banned"):
         return
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 Сегодня",         callback_data="sched_today")],
+        [InlineKeyboardButton("📆 На неделю",        callback_data="sched_week")],
+        [InlineKeyboardButton("▶️ Следующая пара",   callback_data="sched_next")],
+    ])
+    await update.message.reply_text("📅 <b>Расписание</b>", parse_mode="HTML", reply_markup=kb)
+
+
+async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    user = get_user(update.effective_user.id)
+    if not user or not user["approved"] or user.get("banned"):
+        return
+    await _send_today(update.message.reply_text)
+
+
+async def cmd_next(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    user = get_user(update.effective_user.id)
+    if not user or not user["approved"] or user.get("banned"):
+        return
+    await _send_next(update.message.reply_text)
+
+
+async def cmd_week(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    user = get_user(update.effective_user.id)
+    if not user or not user["approved"] or user.get("banned"):
+        return
+    await _send_week(update.message.reply_text)
+
+
+async def _send_today(send):
+    today = date.today()
+    try:
+        lessons = _get_lessons_for_date(today)
+    except Exception as e:
+        await send(f"❌ Ошибка чтения расписания: {e}")
+        return
+    if not lessons:
+        await send("🌅 Сегодня пар нет")
+        return
+    await send(_format_day_schedule(today, lessons), parse_mode="HTML")
+
+
+async def _send_next(send):
+    now = datetime.now(MOSCOW_TZ)
+    try:
+        for delta in range(7):
+            d = date.today() + timedelta(days=delta)
+            lessons = _get_lessons_for_date(d)
+            for l in lessons:
+                if l["dtstart"] > now:
+                    time_s   = l["dtstart"].strftime("%H:%M")
+                    time_e   = l["dtend"].strftime("%H:%M")
+                    day_name = DAYS_RU[d.weekday()]
+                    text     = f"▶️ <b>Следующая пара</b>\n\n"
+                    if delta > 0:
+                        text += f"📅 {day_name}, {d.strftime('%d.%m')}\n"
+                    text += f"📚 {l['summary']}\n🕐 {time_s}–{time_e}"
+                    if l["location"]:
+                        text += f"  ·  🚪 {l['location']}"
+                    if l["description"]:
+                        text += f"\n👤 {l['description']}"
+                    await send(text, parse_mode="HTML")
+                    return
+    except Exception as e:
+        await send(f"❌ Ошибка чтения расписания: {e}")
+        return
+    await send("Ближайших пар не найдено.")
+
+
+async def _send_week(send):
+    today  = date.today()
+    monday = today - timedelta(days=today.weekday())
+    parts  = []
+    try:
+        for i in range(7):
+            d       = monday + timedelta(days=i)
+            lessons = _get_lessons_for_date(d)
+            if lessons:
+                parts.append(_format_day_schedule(d, lessons))
+    except Exception as e:
+        await send(f"❌ Ошибка чтения расписания: {e}")
+        return
+    if not parts:
+        await send("На этой неделе пар нет.")
+        return
+    # Разбиваем на сообщения если превышает лимит Telegram
+    chunk = ""
+    for part in parts:
+        candidate = chunk + ("\n\n" if chunk else "") + part
+        if len(candidate) > 3800:
+            await send(chunk, parse_mode="HTML")
+            chunk = part
+        else:
+            chunk = candidate
+    if chunk:
+        await send(chunk, parse_mode="HTML")
+
+
+# ─── Настройки ───────────────────────────────────────────────────────────────
+
+def _render_settings(user: dict) -> tuple[str, InlineKeyboardMarkup]:
     if user["yandex_login"]:
         yc_btn    = InlineKeyboardButton("📅 Отключить Яндекс.Календарь", callback_data="disconnect_yc")
         yc_status = f"подключён ({user['yandex_login']})"
     else:
         yc_btn    = InlineKeyboardButton("📅 Подключить Яндекс.Календарь", callback_data="connect_yandex")
         yc_status = "не подключён"
+
+    rm       = user.get("reminder_minutes", 0)
+    rm_label = f"{rm} мин" if rm else "выкл"
+    is_quiet = user.get("quiet_until_date") == date.today().isoformat()
+    quiet_label = "🔕 Тихий режим: вкл" if is_quiet else "🔔 Тихий режим: выкл"
+
     kb = InlineKeyboardMarkup([
         [yc_btn],
-        [InlineKeyboardButton("❌ Удалить аккаунт", callback_data="unregister")],
+        [InlineKeyboardButton(f"⏰ Напоминания: {rm_label}", callback_data="reminder_cycle")],
+        [InlineKeyboardButton(quiet_label,                   callback_data="toggle_quiet")],
+        [InlineKeyboardButton("❌ Удалить аккаунт",          callback_data="unregister")],
     ])
-    await update.message.reply_text(
-        f"⚙️ Настройки\n\nЯндекс.Календарь: {yc_status}",
-        reply_markup=kb,
-    )
+    return f"⚙️ Настройки\n\nЯндекс.Календарь: {yc_status}", kb
+
+
+async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    user = get_user(update.effective_user.id)
+    if not user or not user["approved"] or user.get("banned"):
+        return
+    text, kb = _render_settings(user)
+    await update.message.reply_text(text, reply_markup=kb)
+
+
+# ─── Тихий режим ─────────────────────────────────────────────────────────────
+
+async def cmd_quiet(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    user = get_user(update.effective_user.id)
+    if not user or not user["approved"] or user.get("banned"):
+        return
+    tid       = update.effective_user.id
+    today_str = date.today().isoformat()
+    if user.get("quiet_until_date") == today_str:
+        set_quiet_until(tid, None)
+        await update.message.reply_text("🔔 Тихий режим выключен.")
+    else:
+        set_quiet_until(tid, today_str)
+        await update.message.reply_text("🔕 Тихий режим на сегодня включён. Личные напоминания не придут.")
 
 
 # ─── Удаление аккаунта ────────────────────────────────────────────────────────
 
 async def cmd_unregister(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Шаг 1 удаления — показывает подтверждение с предупреждением про календарь.
-    Само удаление происходит в on_callback() при confirm_unregister.
-    Вызывается из настроек (callback "unregister") или командой /unregister.
-    """
     query = update.callback_query
     if query:
         await query.answer()
@@ -850,7 +914,6 @@ async def cmd_unregister(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 def _tid_from_data(data: str) -> int | None:
-    """Извлекает telegram_id из строки вида 'action:TID'. Возвращает None при ошибке."""
     try:
         return int(data.split(":")[1])
     except (IndexError, ValueError):
@@ -860,30 +923,61 @@ def _tid_from_data(data: str) -> int | None:
 # ─── Глобальный обработчик inline-кнопок ─────────────────────────────────────
 
 async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Ловит ВСЕ inline callback_query, которые не перехватил ConversationHandler.
-    ConversationHandler-ы добавлены в app раньше — они имеют приоритет.
-    Поэтому сюда попадают только callback-данные вне активных диалогов.
-
-    Структура callback_data:
-      - Простые строки: "stats", "unregister", "confirm_unregister", "cancel_action",
-                        "disconnect_yc"
-      - С параметром через «:»: "approve:TID", "deny:TID", "ban:TID", "unban:TID",
-                                "owner_remove:TID"  (TID = telegram_id пользователя)
-    """
     query = update.callback_query
     data  = query.data
+    tid   = query.from_user.id
 
     if data == "stats":
         await query.answer()
         await cmd_stats(update, ctx)
         return
 
-    if data == "unregister":
-        # Показываем экран подтверждения (сам cmd_unregister это делает)
+    if data in ("sched_today", "sched_week", "sched_next"):
         await query.answer()
+        send = query.message.reply_text
+        if data == "sched_today":
+            await _send_today(send)
+        elif data == "sched_week":
+            await _send_week(send)
+        else:
+            await _send_next(send)
+        return
+
+    if data == "reminder_cycle":
+        user = get_user(tid)
+        if not user:
+            await query.answer()
+            return
+        current  = user.get("reminder_minutes", 0)
+        next_val = REMINDER_CYCLE.get(current, 0)
+        set_reminder_minutes(tid, next_val)
+        label = f"{next_val} мин" if next_val else "выкл"
+        await query.answer(f"⏰ Напоминания: {label}")
+        user = get_user(tid)
+        text, kb = _render_settings(user)
+        await query.edit_message_text(text, reply_markup=kb)
+        return
+
+    if data == "toggle_quiet":
+        user      = get_user(tid)
+        today_str = date.today().isoformat()
+        if user and user.get("quiet_until_date") == today_str:
+            set_quiet_until(tid, None)
+            await query.answer("🔔 Тихий режим выключен")
+        else:
+            set_quiet_until(tid, today_str)
+            await query.answer("🔕 Тихий режим на сегодня включён")
+        user = get_user(tid)
+        text, kb = _render_settings(user)
+        await query.edit_message_text(text, reply_markup=kb)
+        return
+
+    if data == "unregister":
+        await query.answer()
+        user = get_user(tid)
+        cal_note = "\n📅 Календарь «СПбГАСУ» в Яндексе будет удалён." if (user and user.get("yandex_login")) else ""
         await query.message.reply_text(
-            "⚠️ Удалить аккаунт? Все данные (логин, пароль, Яндекс) будут удалены.",
+            f"⚠️ Удалить аккаунт? Все данные (логин, пароль, Яндекс) будут удалены.{cal_note}",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🗑 Да, удалить", callback_data="confirm_unregister"),
                 InlineKeyboardButton("↩️ Отмена",      callback_data="cancel_action"),
@@ -892,14 +986,7 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "confirm_unregister":
-        """
-        Финальное удаление аккаунта пользователем.
-        Порядок важен: сначала читаем user (нужны данные ЯК), потом удаляем из БД.
-        Если удалить сначала — данные ЯК будут уже недоступны.
-        show_alert=True — всплывающий попап поверх чата, подтверждает действие.
-        """
-        tid  = query.from_user.id
-        user = get_user(tid)
+        user    = get_user(tid)
         cal_msg = ""
         if user and user.get("yandex_login") and user.get("yandex_pass"):
             try:
@@ -926,13 +1013,7 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "disconnect_yc":
-        """
-        Отключение Яндекс.Календаря без удаления аккаунта.
-        Удаляет сам календарь «СПбГАСУ» из Яндекса, затем очищает данные в БД.
-        clear_yandex() ставит yandex_login=NULL и yandex_pass_enc=NULL.
-        """
         await query.answer()
-        tid  = query.from_user.id
         user = get_user(tid)
         if user and user.get("yandex_login") and user.get("yandex_pass"):
             try:
@@ -948,19 +1029,14 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # Далее — только для OWNER_ID
     await query.answer()
-    if query.from_user.id != OWNER_ID:
+    if tid != OWNER_ID:
         return
 
     if data.startswith("owner_remove:"):
-        """
-        Администратор удаляет пользователя через кнопку в /users.
-        Так же как и при самоудалении — сначала удаляем ЯК, потом из БД.
-        try/except вокруг send_message — пользователь мог заблокировать бота.
-        """
-        tid = _tid_from_data(data)
-        if tid is None:
+        owner_tid = _tid_from_data(data)
+        if owner_tid is None:
             return
-        user = get_user(tid)
+        user = get_user(owner_tid)
         if user and user.get("yandex_login") and user.get("yandex_pass"):
             try:
                 from sync_yandex import delete_yandex_calendar
@@ -968,74 +1044,74 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     delete_yandex_calendar, user["yandex_login"], user["yandex_pass"]
                 )
             except Exception as e:
-                log.warning("calendar delete error for %s: %s", tid, e)
-        remove_user(tid)
+                log.warning("calendar delete error for %s: %s", owner_tid, e)
+        remove_user(owner_tid)
         await query.edit_message_text(query.message.text + "\n\n🗑 Удалён")
         try:
-            await ctx.bot.send_message(chat_id=tid, text="Твой аккаунт удалён администратором.")
+            await ctx.bot.send_message(chat_id=owner_tid, text="Твой аккаунт удалён администратором.")
         except Exception:
             pass
         return
 
     if data.startswith("approve:"):
-        tid = _tid_from_data(data)
-        if tid is None:
+        target = _tid_from_data(data)
+        if target is None:
             return
-        approve_user(tid)
+        approve_user(target)
         await query.edit_message_text(query.message.text + "\n\n✅ Одобрено")
         try:
             await ctx.bot.send_message(
-                chat_id=tid,
+                chat_id=target,
                 text="✅ Твоя заявка одобрена! Можешь пользоваться ботом.",
-                reply_markup=reply_keyboard(tid == OWNER_ID),
+                reply_markup=reply_keyboard(target == OWNER_ID),
             )
         except Exception:
             pass
 
     elif data.startswith("deny:"):
-        tid = _tid_from_data(data)
-        if tid is None:
+        target = _tid_from_data(data)
+        if target is None:
             return
-        remove_user(tid)
+        remove_user(target)
         await query.edit_message_text(query.message.text + "\n\n❌ Отклонено и удалено")
         try:
-            await ctx.bot.send_message(chat_id=tid, text="❌ Твоя заявка отклонена.")
+            await ctx.bot.send_message(chat_id=target, text="❌ Твоя заявка отклонена.")
         except Exception:
             pass
 
     elif data.startswith("ban:"):
-        tid = _tid_from_data(data)
-        if tid is None:
+        target = _tid_from_data(data)
+        if target is None:
             return
-        ban_user(tid)
+        ban_user(target)
         await query.edit_message_text(query.message.text + "\n\n🚫 Заблокирован")
         try:
-            await ctx.bot.send_message(chat_id=tid, text="🚫 Твой доступ заблокирован.")
+            await ctx.bot.send_message(chat_id=target, text="🚫 Твой доступ заблокирован.")
         except Exception:
             pass
 
     elif data.startswith("unban:"):
-        tid = _tid_from_data(data)
-        if tid is None:
+        target = _tid_from_data(data)
+        if target is None:
             return
-        unban_user(tid)
+        unban_user(target)
         await query.edit_message_text(query.message.text + "\n\n✅ Разблокирован")
 
 
-# ─── Админ-команды (текстовые, дублируют inline-кнопки из /users) ─────────────
+# ─── Админ-команды ─────────────────────────────────────────────────────────────
 
 async def cmd_approve(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
     try:
-        tid = int(ctx.args[0])
+        target = int(ctx.args[0])
     except ValueError:
         await update.message.reply_text("❌ Укажи числовой ID.")
         return
-    approve_user(tid)
-    await update.message.reply_text(f"✅ {tid} одобрен.")
+    approve_user(target)
+    await update.message.reply_text(f"✅ {target} одобрен.")
     try:
-        await ctx.bot.send_message(chat_id=tid, text="✅ Твоя заявка одобрена! Напиши /start.")
+        await ctx.bot.send_message(chat_id=target, text="✅ Твоя заявка одобрена! Напиши /start.")
     except Exception:
         pass
 
@@ -1044,14 +1120,14 @@ async def cmd_deny(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
     try:
-        tid = int(ctx.args[0])
+        target = int(ctx.args[0])
     except ValueError:
         await update.message.reply_text("❌ Укажи числовой ID.")
         return
-    remove_user(tid)
-    await update.message.reply_text(f"❌ {tid} отклонён.")
+    remove_user(target)
+    await update.message.reply_text(f"❌ {target} отклонён.")
     try:
-        await ctx.bot.send_message(chat_id=tid, text="❌ Твоя заявка отклонена.")
+        await ctx.bot.send_message(chat_id=target, text="❌ Твоя заявка отклонена.")
     except Exception:
         pass
 
@@ -1060,14 +1136,14 @@ async def cmd_ban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
     try:
-        tid = int(ctx.args[0])
+        target = int(ctx.args[0])
     except ValueError:
         await update.message.reply_text("❌ Укажи числовой ID.")
         return
-    ban_user(tid)
-    await update.message.reply_text(f"🚫 {tid} заблокирован.")
+    ban_user(target)
+    await update.message.reply_text(f"🚫 {target} заблокирован.")
     try:
-        await ctx.bot.send_message(chat_id=tid, text="🚫 Твой доступ заблокирован.")
+        await ctx.bot.send_message(chat_id=target, text="🚫 Твой доступ заблокирован.")
     except Exception:
         pass
 
@@ -1076,22 +1152,15 @@ async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
     try:
-        tid = int(ctx.args[0])
+        target = int(ctx.args[0])
     except ValueError:
         await update.message.reply_text("❌ Укажи числовой ID.")
         return
-    unban_user(tid)
-    await update.message.reply_text(f"✅ {tid} разблокирован.")
+    unban_user(target)
+    await update.message.reply_text(f"✅ {target} разблокирован.")
 
 
 async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Список всех пользователей — по одному сообщению на каждого с inline-кнопками.
-    toggle_btn меняется в зависимости от статуса:
-      активен → кнопка «Заблокировать»
-      заблокирован → кнопка «Разбанить»
-      ожидает → кнопка «Одобрить»
-    """
     if update.effective_user.id != OWNER_ID:
         return
     users = get_all_users()
@@ -1100,51 +1169,61 @@ async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(f"👥 Пользователей: {len(users)}")
     for u in users:
-        tid = u["telegram_id"]
+        target = u["telegram_id"]
         if u.get("banned"):
             status     = "🚫 Заблокирован"
-            toggle_btn = InlineKeyboardButton("✅ Разбанить",       callback_data=f"unban:{tid}")
+            toggle_btn = InlineKeyboardButton("✅ Разбанить",     callback_data=f"unban:{target}")
         elif u["approved"]:
             status     = "✅ Активен"
-            toggle_btn = InlineKeyboardButton("🚫 Заблокировать",   callback_data=f"ban:{tid}")
+            toggle_btn = InlineKeyboardButton("🚫 Заблокировать", callback_data=f"ban:{target}")
         else:
             status     = "⏳ Ожидает подтверждения"
-            toggle_btn = InlineKeyboardButton("✅ Одобрить",         callback_data=f"approve:{tid}")
-        yc   = "📅 Яндекс подключён" if u["yandex_login"] else "без Яндекса"
+            toggle_btn = InlineKeyboardButton("✅ Одобрить",       callback_data=f"approve:{target}")
+        yc    = "📅 Яндекс подключён" if u["yandex_login"] else "без Яндекса"
         sname = u.get("student_name") or "—"
-        text = f"{status}\nID: {tid} | Портал: {u['login']} | {sname}\n{yc}"
-        kb   = InlineKeyboardMarkup([[
+        text  = f"{status}\nID: {target} | Портал: {u['login']} | {sname}\n{yc}"
+        kb    = InlineKeyboardMarkup([[
             toggle_btn,
-            InlineKeyboardButton("🗑 Удалить", callback_data=f"owner_remove:{tid}"),
+            InlineKeyboardButton("🗑 Удалить", callback_data=f"owner_remove:{target}"),
         ]])
         await update.message.reply_text(text, reply_markup=kb)
 
 
 async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Текстовая команда удаления — дублирует кнопку «🗑 Удалить» в /users."""
     if update.effective_user.id != OWNER_ID or not ctx.args:
         return
     try:
-        tid = int(ctx.args[0])
+        target = int(ctx.args[0])
     except ValueError:
         await update.message.reply_text("❌ Укажи числовой ID.")
         return
-    remove_user(tid)
+    remove_user(target)
     await update.message.reply_text("✅ Удалён.")
 
 
+async def cmd_announce(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Рассылка всем одобренным пользователям."""
+    if update.effective_user.id != OWNER_ID or not ctx.args:
+        return
+    text  = " ".join(ctx.args)
+    users = get_all_users()
+    sent  = 0
+    for u in users:
+        if u["approved"] and not u.get("banned"):
+            try:
+                await ctx.bot.send_message(u["telegram_id"], f"📢 {text}")
+                sent += 1
+            except Exception:
+                pass
+    await update.message.reply_text(f"✅ Отправлено {sent} пользователям.")
+
+
 async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Отправляет debug_lk.html — последний сохранённый HTML страницы /lk/ портала.
-    Нужен для отладки парсера когда аттестации не парсятся.
-    Файл сохраняется в DATA_DIR (/data на Amvera) при каждом вызове /stats.
-    """
     if update.effective_user.id != OWNER_ID:
         return
-    from pathlib import Path
     owner = get_user(OWNER_ID)
     login = owner["login"] if owner else "unknown"
-    path = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.html"
+    path  = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.html"
     if not path.exists():
         await update.message.reply_text(f"{path.name} не найден — сначала вызови /stats")
         return
@@ -1152,21 +1231,46 @@ async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_sendpng(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """
-    Отправляет debug_lk.png — полностраничный скриншот /lk/ портала.
-    Помогает понять что именно видит Playwright: дашборд или форму логина.
-    Если на скрине форма логина — значит сессия протухла или логин/пароль неверный.
-    """
     if update.effective_user.id != OWNER_ID:
         return
-    from pathlib import Path
     owner = get_user(OWNER_ID)
     login = owner["login"] if owner else "unknown"
-    path = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.png"
+    path  = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.png"
     if not path.exists():
         await update.message.reply_text(f"{path.name} не найден — сначала вызови /stats")
         return
     await update.message.reply_photo(photo=open(path, "rb"))
+
+
+# ─── Помощь и обратная связь ─────────────────────────────────────────────────
+
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+    await update.message.reply_text(
+        "🤖 <b>GASUCHKA — команды</b>\n\n"
+        "/stats — посещаемость и аттестации\n"
+        "/next — следующая пара\n"
+        "/today — расписание на сегодня\n"
+        "/week — расписание на неделю\n"
+        "/quiet — тихий режим на сегодня (без личных напоминаний)\n"
+        "/feedback — написать администратору\n"
+        "/cancel — отменить текущее действие",
+        parse_mode="HTML",
+    )
+
+
+async def cmd_feedback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private" or not ctx.args:
+        if update.effective_chat.type == "private":
+            await update.message.reply_text("Напиши: /feedback <сообщение>")
+        return
+    user    = get_user(update.effective_user.id)
+    from_id = update.effective_user.id
+    name    = user.get("student_name") or (user["login"] if user else str(from_id))
+    text    = " ".join(ctx.args)
+    await ctx.bot.send_message(OWNER_ID, f"📬 Feedback от {name} ({from_id}):\n\n{text}")
+    await update.message.reply_text("✉️ Отправлено администратору.")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -1175,14 +1279,8 @@ def main():
     init_db()
     app = Application.builder().token(TOKEN).post_init(_post_init).post_shutdown(_post_shutdown).build()
 
-    # not_kb — фильтр, исключающий тексты кнопок reply_keyboard из ConversationHandler.
-    # Без него нажатие «📋 Аттестации» во время диалога регистрации интерпретировалось бы
-    # как ввод логина/пароля — пользователь ломал бы сессию случайным нажатием кнопки.
     not_kb = ~filters.Regex("^(" + "|".join(re.escape(b) for b in KB_BTNS) + ")$")
 
-    # reg_handler — диалог регистрации нового пользователя.
-    # allow_reentry=True — пользователь может начать /start заново если передумал в середине.
-    # Два entry_point: /start (команда) и callback "register" (inline-кнопка).
     reg_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", cmd_start, filters=filters.ChatType.PRIVATE),
@@ -1199,9 +1297,6 @@ def main():
         allow_reentry=True,
     )
 
-    # yc_handler — отдельный диалог подключения ЯК уже зарегистрированным пользователем.
-    # Отдельный от reg_handler чтобы не смешивать состояния (у них разные state-константы).
-    # Entry point — callback "connect_yandex" из кнопки настроек или /connect_yandex.
     yc_handler = ConversationHandler(
         entry_points=[
             CommandHandler("connect_yandex", cmd_connect_yandex, filters=filters.ChatType.PRIVATE),
@@ -1214,12 +1309,17 @@ def main():
         fallbacks=[CommandHandler("cancel", cmd_cancel)],
     )
 
-    # ПОРЯДОК ВАЖЕН: ConversationHandler-ы первыми — они перехватывают апдейты раньше.
-    # on_callback идёт после — ловит только те callback, что не забрал ни один диалог.
     app.add_handler(reg_handler)
     app.add_handler(yc_handler)
     app.add_handler(CallbackQueryHandler(on_callback))
     app.add_handler(CommandHandler("stats",      cmd_stats))
+    app.add_handler(CommandHandler("next",       cmd_next))
+    app.add_handler(CommandHandler("today",      cmd_today))
+    app.add_handler(CommandHandler("week",       cmd_week))
+    app.add_handler(CommandHandler("quiet",      cmd_quiet))
+    app.add_handler(CommandHandler("help",       cmd_help))
+    app.add_handler(CommandHandler("feedback",   cmd_feedback))
+    app.add_handler(CommandHandler("announce",   cmd_announce))
     app.add_handler(CommandHandler("unregister", cmd_unregister))
     app.add_handler(CommandHandler("approve",    cmd_approve))
     app.add_handler(CommandHandler("deny",       cmd_deny))
@@ -1230,12 +1330,10 @@ def main():
     app.add_handler(CommandHandler("sendhtml",   cmd_sendhtml))
     app.add_handler(CommandHandler("sendpng",    cmd_sendpng))
 
-    # Обработчики кнопок reply-клавиатуры — добавляются ПОСЛЕ ConversationHandler-ов.
-    # Сами тексты кнопок исключены из состояний диалогов через фильтр not_kb выше,
-    # поэтому здесь они гарантированно обрабатываются глобальными хендлерами.
     app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_STATS)}$")    & filters.ChatType.PRIVATE, cmd_stats))
-    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_USERS)}$")    & filters.ChatType.PRIVATE, cmd_users))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_SCHEDULE)}$") & filters.ChatType.PRIVATE, cmd_schedule_menu))
     app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_SETTINGS)}$") & filters.ChatType.PRIVATE, cmd_settings))
+    app.add_handler(MessageHandler(filters.Regex(f"^{re.escape(BTN_USERS)}$")    & filters.ChatType.PRIVATE, cmd_users))
 
     log.info("Bot started")
     app.run_polling(drop_pending_updates=True)
