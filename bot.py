@@ -37,6 +37,8 @@ import re
 import urllib.request
 import warnings
 
+import requests as _requests
+
 try:
     from telegram.warnings import PTBUserWarning as _PTBUserWarning
 except ImportError:
@@ -140,6 +142,48 @@ async def _post_shutdown(app):
 
 
 # ─── Вспомогательные функции ──────────────────────────────────────────────────
+
+PORTAL_AUTH_URL = "https://portal.spbgasu.ru/auth/"
+
+
+def _test_portal(login: str, password: str) -> str | None:
+    """
+    Проверяет логин/пароль портала через HTTP (~2-3 сек, без Playwright).
+    Returns None если OK или не удалось проверить, строку с ошибкой если точно неверный пароль.
+    Логика: успех = оказались на /lk/ после POST; провал = форма логина снова видна.
+    Сетевые ошибки — пропускаем, чтобы не блокировать регистрацию когда портал лежит.
+    """
+    try:
+        s = _requests.Session()
+        s.headers["User-Agent"] = "Mozilla/5.0 (compatible; GASUCHKA)"
+        r = s.get(PORTAL_AUTH_URL, timeout=15)
+        m = re.search(r'name=["\']sessid["\']\s+value=["\']([^"\']+)["\']', r.text)
+        sessid = m.group(1) if m else ""
+        r2 = s.post(
+            PORTAL_AUTH_URL,
+            data={
+                "AUTH_FORM": "Y",
+                "TYPE": "AUTH",
+                "USER_LOGIN": login,
+                "USER_PASSWORD": password,
+                "USER_REMEMBER": "N",
+                "sessid": sessid,
+            },
+            timeout=15,
+            allow_redirects=True,
+        )
+        if "/lk/" in r2.url:
+            return None
+        # Форма логина снова видна — пароль точно неверный
+        if 'name="USER_LOGIN"' in r2.text or "name='USER_LOGIN'" in r2.text:
+            return "Неверный логин или пароль портала"
+        return None  # непонятный ответ — пропускаем
+    except (_requests.exceptions.Timeout, _requests.exceptions.ConnectionError):
+        return None  # портал недоступен — не блокируем регистрацию
+    except Exception as e:
+        log.warning("portal check error: %s", e)
+        return None
+
 
 def _test_yandex(ylogin: str, ypass: str) -> str | None:
     try:
@@ -260,6 +304,20 @@ async def got_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not password or len(password) > 256:
         await update.message.reply_text("❌ Пароль должен быть от 1 до 256 символов. Попробуй ещё раз:")
         return WAIT_PASSWORD
+
+    login = ctx.user_data.get("login", "")
+    checking = await update.message.reply_text("⏳ Проверяю логин и пароль портала...")
+    err = await asyncio.to_thread(_test_portal, login, password)
+    if err:
+        await checking.edit_text(
+            f"❌ {err}\n\n"
+            f"Логин: <code>{html_mod.escape(login)}</code>\n"
+            "Введи пароль ещё раз:",
+            parse_mode="HTML",
+        )
+        return WAIT_PASSWORD
+
+    await checking.delete()
     ctx.user_data["password"] = password
     await update.message.reply_text(
         "📝 <b>Регистрация — шаг 3 из 3</b>\n\n"
