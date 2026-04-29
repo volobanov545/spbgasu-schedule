@@ -11,7 +11,7 @@ import hashlib
 import os
 import re
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -229,9 +229,11 @@ def build_ics(events: list[dict]) -> bytes:
     cal.add("x-wr-calname", "СПбГАСУ Расписание")
     cal.add("x-wr-timezone", "Europe/Moscow")
 
+    dtstamp = datetime.now(timezone.utc)
     for e in events:
         ev = Event()
         ev.add("uid",         e["uid"])
+        ev.add("dtstamp",     dtstamp)
         ev.add("summary",     e["summary"])
         ev.add("dtstart",     e["dtstart"])
         ev.add("dtend",       e["dtend"])

@@ -11,6 +11,7 @@ import io
 import os
 import sys
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 import caldav
@@ -87,6 +88,8 @@ def sync_calendar(ylogin: str, ypass: str, ics_path: Path | None = None, cal_nam
         if component.name != "VEVENT":
             continue
         uid = str(component.get("UID"))
+        if not component.get("DTSTAMP"):
+            component.add("dtstamp", datetime.now(timezone.utc))
         single = Calendar()
         single.add("prodid", "-//SPbГАСУ Schedule//RU")
         single.add("version", "2.0")
