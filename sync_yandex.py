@@ -14,6 +14,7 @@ import urllib.request
 from pathlib import Path
 
 import caldav
+from caldav.lib.error import AuthorizationError
 from icalendar import Calendar
 
 ICS_FILE    = Path(__file__).parent / "schedule.ics"
@@ -108,13 +109,22 @@ def main():
         print(f"[ERROR] Файл не найден: {ICS_FILE}")
         sys.exit(1)
 
+    if not LOGIN or not APPPASS:
+        print("[WARN] YANDEX_LOGIN/YANDEX_APPPASS не заданы, пропускаю синхронизацию Яндекс.Календаря")
+        return
+
     client = caldav.DAVClient(
         url=CALDAV_URL,
         username=f"{LOGIN}@yandex.ru",
         password=APPPASS,
     )
 
-    principal = client.principal()
+    try:
+        principal = client.principal()
+    except AuthorizationError:
+        print("[WARN] Яндекс.Календарь: неверный логин или пароль приложения, пропускаю синхронизацию")
+        return
+
     calendars = principal.calendars()
 
     is_new = False
