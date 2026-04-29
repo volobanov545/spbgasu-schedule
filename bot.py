@@ -91,7 +91,7 @@ log = logging.getLogger(__name__)
 TOKEN      = os.environ["TG_TOKEN"]
 OWNER_ID   = int(os.environ["TG_OWNER_ID"])
 TG_CHANNEL = os.environ.get("TG_CHANNEL", "")
-CHANNEL_REMINDERS = os.environ.get("CHANNEL_REMINDERS", "0").lower() in ("1", "true", "yes", "on")
+CHANNEL_REMINDERS = os.environ.get("CHANNEL_REMINDERS", "1").lower() in ("1", "true", "yes", "on")
 
 MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
