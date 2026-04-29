@@ -235,6 +235,14 @@ DESCRIPTION:Летенко Д.Г.\, Кострикин М.П.
 LOCATION:309/С
 END:VEVENT
 BEGIN:VEVENT
+SUMMARY:Высшая математика (пр.)
+DTSTART;TZID=Europe/Moscow:20260504T150000
+DTEND;TZID=Europe/Moscow:20260504T163000
+UID:0b8ccfa7d1af7de76456fc3e6e3ff66f@portal.spbgasu.ru
+DESCRIPTION:Немченко Е.И.
+LOCATION:412/С
+END:VEVENT
+BEGIN:VEVENT
 SUMMARY:Информационные технологии графичес
  кого проектирования (пр.)
 DTSTART;TZID=Europe/Moscow:20260505T090000
