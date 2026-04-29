@@ -60,6 +60,7 @@ jobs:
           git diff --quiet schedule.ics journals_state.json pending_notification.json && echo "Без изменений" || (
             git add schedule.ics journals_state.json pending_notification.json &&
             git commit -m "chore: update schedule $(date +'%Y-%m-%d')" &&
+            git pull --rebase https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main &&
             git push https://volobanov5:${{ secrets.GV_TOKEN }}@gitverse.ru/volobanov5/spbgasu-schedule.git main
           )
 
