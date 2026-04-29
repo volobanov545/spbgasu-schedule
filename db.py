@@ -3,11 +3,15 @@ import sqlite3
 from pathlib import Path
 from cryptography.fernet import Fernet
 
+# База живёт в DATA_DIR на Amvera. Это persistent storage: контейнер можно
+# пересобрать, а users.db с логинами, зашифрованными паролями и настройками
+# пользователей останется на месте.
 DB_PATH = Path(os.environ.get("DATA_DIR", ".")) / "users.db"
 _fernet = None
 
 
 def _get_fernet() -> Fernet:
+    """Лениво создаёт Fernet-объект, чтобы падать только при реальной работе с секретами."""
     global _fernet
     if _fernet is None:
         key = os.environ["FERNET_KEY"]
@@ -58,6 +62,12 @@ def init_db():
 
 
 def add_user(telegram_id: int, login: str, password: str, student_name: str = ""):
+    """Создаёт или обновляет заявку пользователя.
+
+    Пароль портала никогда не пишется в БД открытым текстом: сохраняется только
+    Fernet-токен. При повторной регистрации заявка остаётся неподтверждённой,
+    чтобы владелец бота снова проверил пользователя.
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
         """INSERT INTO users (telegram_id, portal_login, portal_pass_enc, approved, student_name)
@@ -73,6 +83,7 @@ def add_user(telegram_id: int, login: str, password: str, student_name: str = ""
 
 
 def set_yandex(telegram_id: int, ylogin: str, ypass: str):
+    """Сохраняет личные CalDAV-данные пользователя для синхронизации его календаря."""
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
         "UPDATE users SET yandex_login=?, yandex_pass_enc=? WHERE telegram_id=?",
@@ -146,6 +157,11 @@ def remove_user(telegram_id: int):
 
 
 def get_user(telegram_id: int) -> dict | None:
+    """Возвращает одного пользователя с расшифрованными паролями для runtime-операций.
+
+    Эта функция нужна боту и парсерам. Не логировать возвращаемый dict целиком:
+    внутри есть пароль портала и пароль приложения Яндекса.
+    """
     conn = sqlite3.connect(DB_PATH)
     row = conn.execute(
         """SELECT portal_login, portal_pass_enc, approved, banned, yandex_login, yandex_pass_enc,
@@ -172,6 +188,11 @@ def get_user(telegram_id: int) -> dict | None:
 
 
 def get_all_users() -> list[dict]:
+    """Возвращает пользователей для админки, рассылок и массовой синхронизации.
+
+    Как и get_user(), возвращает расшифрованные секреты. Использовать только в
+    trusted-коде бота, не отдавать результат наружу.
+    """
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(
         """SELECT telegram_id, portal_login, portal_pass_enc, approved, banned, yandex_login,

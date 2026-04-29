@@ -37,6 +37,11 @@ DATA_DIR     = Path(os.environ.get("DATA_DIR", "."))
 
 
 def _save_debug_html(html: str, filename: str):
+    """Пишет HTML-дамп в DATA_DIR для отладки парсера.
+
+    В этих файлах может быть личная информация из кабинета, поэтому они должны
+    оставаться в persistent storage Amvera и не попадать в git.
+    """
     try:
         (DATA_DIR / filename).write_text(html, encoding="utf-8")
         log.info("Debug HTML сохранён: %s (%d байт)", filename, len(html))
@@ -90,6 +95,12 @@ async def login_with_session(context, portal_login: str, portal_pass: str):
 
 
 async def login(page, login: str = "", password: str = ""):
+    """Свежий логин в портал.
+
+    Для бота намеренно не переиспользуем старые cookies: портал иногда отдаёт
+    форму логина внутри Vue-страницы вместо данных, и это приводило к пустым
+    аттестациям. Свежий логин медленнее, но надёжнее.
+    """
     _login = login or PORTAL_LOGIN
     _pass  = password or PORTAL_PASS
     page.set_default_timeout(60000)
@@ -400,6 +411,12 @@ async def _async_quick(portal_login: str, portal_pass: str) -> dict:
 
 
 def parse_lk_quick(portal_login: str, portal_pass: str) -> dict:
+    """Быстрый путь для кнопки "Аттестации" в боте.
+
+    Возвращает главную страницу ЛК: сводку посещаемости и аттестации. Журналы по
+    каждому предмету не обходит, чтобы ответ в Telegram занимал секунды, а не
+    минуты и не забивал память Playwright.
+    """
     return asyncio.run(_async_quick(portal_login, portal_pass))
 
 

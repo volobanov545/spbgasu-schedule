@@ -203,13 +203,20 @@ def _test_yandex(ylogin: str, ypass: str) -> str | None:
 
 
 def _normalize_yandex_login(ylogin: str) -> str:
+    """Храним логин Яндекса без домена, чтобы не получить user@yandex.ru@yandex.ru."""
     ylogin = ylogin.strip()
     return ylogin[:-10] if ylogin.lower().endswith("@yandex.ru") else ylogin
 
 
 def _yandex_username(ylogin: str) -> str:
+    """CalDAV принимает полный username; пользователь может ввести логин как с доменом, так и без."""
     ylogin = ylogin.strip()
     return ylogin if "@" in ylogin else f"{ylogin}@yandex.ru"
+
+
+def _safe_debug_login(login: str) -> str:
+    """Имя debug-файла строится из логина портала, поэтому оставляем только безопасные символы."""
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", login) or "unknown"
 
 
 YC_INSTRUCTION = (
@@ -753,6 +760,11 @@ async def send_lesson_reminder_dm(app, lesson: dict, telegram_id: int, minutes: 
 
 
 async def schedule_daily_reminders(app):
+    """Планирует напоминания на текущий день.
+
+    Канал получает общий сигнал за 30 минут до пары. Личные DM-настройки гибкие,
+    потому что дорога до вуза у всех разная.
+    """
     today = date.today()
     try:
         lessons = _get_lessons_for_date(today)
@@ -808,7 +820,11 @@ def _clear_user_reminders(telegram_id: int):
 
 
 async def sync_all_yandex_calendars(app=None) -> tuple[int, int]:
-    """Синхронизирует общий schedule.ics из GitVerse в личные календари подключённых пользователей."""
+    """Синхронизирует общий schedule.ics из GitVerse в личные календари подключённых пользователей.
+
+    GitVerse не должен знать личные Яндекс-пароли ребят. Они хранятся только в
+    SQLite на Amvera, поэтому массовая синхронизация живёт в боте, а не в CI.
+    """
     try:
         from sync_yandex import sync_calendar
     except Exception as e:
@@ -1335,6 +1351,7 @@ async def cmd_announce(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_sync_yandex_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Админская ручная проверка массовой CalDAV-синхронизации без ожидания cron."""
     if update.effective_user.id != OWNER_ID:
         return
     msg = await update.message.reply_text("⏳ Синхронизирую Яндекс.Календари пользователей...")
@@ -1343,10 +1360,15 @@ async def cmd_sync_yandex_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Отдаёт владельцу последний debug HTML его ЛК.
+
+    Команда закрыта OWNER_ID, потому что HTML может содержать персональные данные
+    с портала. Файл лежит в DATA_DIR и не должен попадать в git.
+    """
     if update.effective_user.id != OWNER_ID:
         return
     owner = get_user(OWNER_ID)
-    login = owner["login"] if owner else "unknown"
+    login = _safe_debug_login(owner["login"] if owner else "unknown")
     path  = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.html"
     if not path.exists():
         await update.message.reply_text(f"{path.name} не найден — сначала вызови /stats")
@@ -1355,10 +1377,11 @@ async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_sendpng(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Отдаёт владельцу последний debug-скриншот его ЛК; доступ ограничен OWNER_ID."""
     if update.effective_user.id != OWNER_ID:
         return
     owner = get_user(OWNER_ID)
-    login = owner["login"] if owner else "unknown"
+    login = _safe_debug_login(owner["login"] if owner else "unknown")
     path  = Path(os.environ.get("DATA_DIR", ".")) / f"debug_lk_{login}.png"
     if not path.exists():
         await update.message.reply_text(f"{path.name} не найден — сначала вызови /stats")

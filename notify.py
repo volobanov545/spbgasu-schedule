@@ -58,6 +58,12 @@ def fmt_event(e: dict) -> str:
 
 
 def build_diff_message(old: dict, new: dict) -> str | None:
+    """Строит сообщение только по реальным изменениям расписания.
+
+    GitVerse запускается три раза в день, но канал не должен получать шум при
+    каждом запуске. Поэтому notify.py сравнивает старый schedule.ics из HEAD и
+    новый файл после парсинга, а затем пишет pending_notification.json для GitHub.
+    """
     added   = {uid: e for uid, e in new.items() if uid not in old}
     removed = {uid: e for uid, e in old.items() if uid not in new}
     changed = {}
@@ -128,7 +134,12 @@ def tg_send(chat_id: str, text: str, label: str):
 
 
 def save_pending(channel_msg: str | None, dm_msg: str | None):
-    """Сохраняет сообщения для отправки через GitHub Actions."""
+    """Сохраняет сообщения для отправки через GitHub Actions.
+
+    GitVerse может парсить портал, но Telegram из российских runner'ов часто
+    недоступен. Поэтому GitVerse только коммитит pending_notification.json, а
+    GitHub Actions уже читает этот файл и отправляет сообщение в Telegram.
+    """
     payload = {"channel": channel_msg, "dm": dm_msg}
     PENDING_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     has = [k for k, v in payload.items() if v]
@@ -145,6 +156,12 @@ def load_journal_state(path: str) -> dict:
 
 
 def build_journal_diff_message(old: dict, new: dict) -> str | None:
+    """Старый CI-режим уведомлений по журналам.
+
+    Основной пользовательский сценарий теперь живёт в Amvera-боте: каждый студент
+    смотрит свои аттестации по личному логину. Этот код оставлен как best-effort
+    baseline для владельца и не должен блокировать уведомления расписания.
+    """
     lines = []
 
     # Изменения в аттестациях (из главной страницы)

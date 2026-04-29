@@ -36,6 +36,8 @@ jobs:
         run: python parse_portal.py
 
       - name: Parse journals from portal
+        # Журналы вторичны: если портал завис на таблице посещаемости, это не
+        # должно блокировать главную функцию проекта — уведомления расписания.
         continue-on-error: true
         env:
           PORTAL_LOGIN: ${{ secrets.PORTAL_LOGIN }}
@@ -48,6 +50,8 @@ jobs:
           python notify.py old_schedule.ics schedule.ics old_journals_state.json journals_state.json
 
       - name: Sync to Яндекс.Календарь
+        # Общий календарь владельца — best-effort. Личные календари пользователей
+        # синхронизирует Amvera-бот по данным из своей SQLite-базы.
         env:
           YANDEX_LOGIN:   ${{ secrets.YANDEX_LOGIN }}
           YANDEX_APPPASS: ${{ secrets.YANDEX_APPPASS }}

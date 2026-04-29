@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.log
+.env
+.venv/
+
+# Runtime state generated locally or in CI. These files may contain personal
+# schedule/journal data and should only be committed intentionally by workflows.
+users.db
+*.db
+old_*.ics
+old_*.json
+journals_state.json
+pending_notification.json
+
+# Debug dumps from Playwright can contain personal cabinet data.
+debug_*.html
+debug_*.png
+portal_explore/
+

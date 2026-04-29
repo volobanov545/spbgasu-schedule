@@ -44,6 +44,7 @@ def parse_time_range(text: str):
 
 
 def make_uid(day_str: str, start: str, subject: str) -> str:
+    """Стабильный UID нужен, чтобы diff видел перенос/замену как изменение события."""
     raw = f"portal-spbgasu-{day_str}-{start}-{subject}"
     return hashlib.md5(raw.encode()).hexdigest() + "@portal.spbgasu.ru"
 
@@ -195,7 +196,12 @@ async def click_arrow(page, direction: str):
 
 
 async def collect_events(page) -> list[dict]:
-    """Собирает события за WEEKS недель."""
+    """Собирает события за WEEKS недель.
+
+    Идём на неделю назад, потом вперёд: так в ICS попадают прошлая, текущая и две
+    следующие недели. Это нужно для diff'ов: если преподаватели правят уже
+    опубликованную неделю, бот увидит изменение и отправит его в канал.
+    """
     all_events: dict[str, dict] = {}
 
     # Идём на 1 неделю назад

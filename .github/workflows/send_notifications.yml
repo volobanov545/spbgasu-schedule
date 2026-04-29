@@ -19,6 +19,8 @@ jobs:
           TG_OWNER_ID: ${{ secrets.TG_OWNER_ID }}
         run: |
           python3 - <<'EOF'
+          # GitVerse генерирует pending_notification.json, а GitHub отправляет
+          # его в Telegram: у GitHub runner'ов обычно нет проблем с доступом к API.
           import json, os, urllib.request, urllib.parse
 
           data = json.loads(open("pending_notification.json", encoding="utf-8").read())
