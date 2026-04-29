@@ -33,11 +33,16 @@ APPPASS     = os.environ.get("YANDEX_APPPASS", "")
 CAL_NAME    = os.environ.get("YANDEX_CAL_NAME", "СПбГАСУ")
 
 
+def _yandex_username(ylogin: str) -> str:
+    ylogin = ylogin.strip()
+    return ylogin if "@" in ylogin else f"{ylogin}@yandex.ru"
+
+
 def delete_yandex_calendar(ylogin: str, ypass: str, cal_name: str = "СПбГАСУ") -> bool:
     """Удаляет календарь cal_name из Яндекс. Возвращает True если нашёл и удалил."""
     client = caldav.DAVClient(
         url=CALDAV_URL,
-        username=f"{ylogin}@yandex.ru",
+        username=_yandex_username(ylogin),
         password=ypass,
     )
     principal = client.principal()
@@ -52,7 +57,7 @@ def sync_calendar(ylogin: str, ypass: str, ics_path: Path | None = None, cal_nam
     """Синхронизирует ICS в Яндекс.Календарь. Вызывается ботом для каждого пользователя."""
     client = caldav.DAVClient(
         url=CALDAV_URL,
-        username=f"{ylogin}@yandex.ru",
+        username=_yandex_username(ylogin),
         password=ypass,
     )
     principal = client.principal()
@@ -115,7 +120,7 @@ def main():
 
     client = caldav.DAVClient(
         url=CALDAV_URL,
-        username=f"{LOGIN}@yandex.ru",
+        username=_yandex_username(LOGIN),
         password=APPPASS,
     )
 

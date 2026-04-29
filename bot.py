@@ -189,13 +189,23 @@ def _test_yandex(ylogin: str, ypass: str) -> str | None:
     try:
         client = caldav.DAVClient(
             url="https://caldav.yandex.ru",
-            username=f"{ylogin}@yandex.ru",
+            username=_yandex_username(ylogin),
             password=ypass,
         )
         client.principal()
         return None
     except Exception as e:
         return str(e)
+
+
+def _normalize_yandex_login(ylogin: str) -> str:
+    ylogin = ylogin.strip()
+    return ylogin[:-10] if ylogin.lower().endswith("@yandex.ru") else ylogin
+
+
+def _yandex_username(ylogin: str) -> str:
+    ylogin = ylogin.strip()
+    return ylogin if "@" in ylogin else f"{ylogin}@yandex.ru"
 
 
 YC_INSTRUCTION = (
@@ -342,7 +352,7 @@ async def got_yc_choice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    yc_login = update.message.text.strip()
+    yc_login = _normalize_yandex_login(update.message.text)
     if not yc_login or len(yc_login) > 64:
         await update.message.reply_text("❌ Логин Яндекса должен быть до 64 символов. Попробуй ещё раз:")
         return WAIT_YC_LOGIN
@@ -437,7 +447,7 @@ async def cmd_connect_yandex(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_yc2_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    yc_login = update.message.text.strip()
+    yc_login = _normalize_yandex_login(update.message.text)
     if not yc_login or len(yc_login) > 64:
         await update.message.reply_text("❌ Логин Яндекса должен быть до 64 символов. Попробуй ещё раз:")
         return WAIT_YC2_LOGIN
@@ -532,8 +542,7 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if user["yandex_login"] and user["yandex_pass"]:
         try:
             from sync_yandex import sync_calendar
-            ics = Path(__file__).parent / "schedule.ics"
-            await asyncio.to_thread(sync_calendar, user["yandex_login"], user["yandex_pass"], ics)
+            await asyncio.to_thread(sync_calendar, user["yandex_login"], user["yandex_pass"], None)
         except Exception as e:
             log.warning("yandex sync error: %s", e)
             await send(
@@ -610,14 +619,18 @@ ICS_URL  = "https://gitverse.ru/api/repos/volobanov5/spbgasu-schedule/raw/branch
 DAYS_RU  = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
 
 
-def _get_lessons_for_date(target_date: date) -> list[dict]:
+def _read_schedule_ics() -> bytes:
     ics_path = Path(__file__).parent / "schedule.ics"
-    if ics_path.exists():
-        raw = ics_path.read_bytes()
-    else:
+    try:
         with urllib.request.urlopen(ICS_URL, timeout=30) as r:
-            raw = r.read()
+            return r.read()
+    except Exception as e:
+        log.warning("Не удалось загрузить расписание из GitVerse, использую локальный schedule.ics: %s", e)
+        return ics_path.read_bytes()
 
+
+def _get_lessons_for_date(target_date: date) -> list[dict]:
+    raw = _read_schedule_ics()
     cal     = Calendar.from_ical(raw)
     lessons = []
     for component in cal.walk():
