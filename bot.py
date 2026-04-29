@@ -132,6 +132,9 @@ async def _post_init(app):
 
     scheduler.add_job(morning_schedule,         "cron", hour=8, minute=0,  args=[app])
     scheduler.add_job(schedule_daily_reminders, "cron", hour=7, minute=50, args=[app])
+    scheduler.add_job(sync_all_yandex_calendars, "cron", hour=7,  minute=15, args=[app])
+    scheduler.add_job(sync_all_yandex_calendars, "cron", hour=13, minute=45, args=[app])
+    scheduler.add_job(sync_all_yandex_calendars, "cron", hour=21, minute=15, args=[app])
     scheduler.start()
     await schedule_daily_reminders(app)
     log.info("APScheduler запущен")
@@ -796,6 +799,37 @@ async def schedule_daily_reminders(app):
         log.info("Запланировано напоминаний в канал: %d", scheduled)
 
 
+async def sync_all_yandex_calendars(app=None) -> tuple[int, int]:
+    """Синхронизирует общий schedule.ics из GitVerse в личные календари подключённых пользователей."""
+    try:
+        from sync_yandex import sync_calendar
+    except Exception as e:
+        log.warning("yandex bulk sync import error: %s", e)
+        return 0, 0
+
+    ok = failed = 0
+    for user in get_all_users():
+        if not user["approved"] or user.get("banned"):
+            continue
+        if not user.get("yandex_login") or not user.get("yandex_pass"):
+            continue
+        try:
+            synced = await asyncio.to_thread(
+                sync_calendar,
+                user["yandex_login"],
+                user["yandex_pass"],
+                None,
+            )
+            ok += 1
+            log.info("Яндекс синхронизирован для %s: %d событий", user["telegram_id"], synced)
+        except Exception as e:
+            failed += 1
+            log.warning("Яндекс bulk sync error for %s: %s", user["telegram_id"], e)
+
+    log.info("Яндекс bulk sync: ok=%d failed=%d", ok, failed)
+    return ok, failed
+
+
 # ─── Команды расписания ───────────────────────────────────────────────────────
 
 async def cmd_schedule_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1289,6 +1323,14 @@ async def cmd_announce(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Отправлено {sent} пользователям.")
 
 
+async def cmd_sync_yandex_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    msg = await update.message.reply_text("⏳ Синхронизирую Яндекс.Календари пользователей...")
+    ok, failed = await sync_all_yandex_calendars(ctx.application)
+    await msg.edit_text(f"📅 Яндекс.Календари: успешно {ok}, ошибок {failed}.")
+
+
 async def cmd_sendhtml(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
@@ -1398,6 +1440,7 @@ def main():
     app.add_handler(CommandHandler("unban",      cmd_unban))
     app.add_handler(CommandHandler("users",      cmd_users))
     app.add_handler(CommandHandler("remove",     cmd_remove))
+    app.add_handler(CommandHandler("sync_yandex_all", cmd_sync_yandex_all))
     app.add_handler(CommandHandler("sendhtml",   cmd_sendhtml))
     app.add_handler(CommandHandler("sendpng",    cmd_sendpng))
 
