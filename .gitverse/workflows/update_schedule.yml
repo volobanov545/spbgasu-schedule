@@ -1,6 +1,13 @@
 name: Update Schedule
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "schedule.ics"
+      - "session.ics"
+      - "journals_state.json"
+      - "pending_notification.json"
   schedule:
     - cron: "0 4 * * *"   # 07:00 МСК
     - cron: "30 10 * * *" # 13:30 МСК
