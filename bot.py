@@ -91,6 +91,7 @@ log = logging.getLogger(__name__)
 TOKEN      = os.environ["TG_TOKEN"]
 OWNER_ID   = int(os.environ["TG_OWNER_ID"])
 TG_CHANNEL = os.environ.get("TG_CHANNEL", "")
+CHANNEL_REMINDERS = os.environ.get("CHANNEL_REMINDERS", "0").lower() in ("1", "true", "yes", "on")
 
 MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
@@ -102,8 +103,8 @@ WAIT_LOGIN, WAIT_PASSWORD, WAIT_YC_CHOICE, WAIT_YC_LOGIN, WAIT_YC_PASS = range(5
 # Состояния ConversationHandler подключения Яндекса после регистрации (10–11)
 WAIT_YC2_LOGIN, WAIT_YC2_PASS = range(10, 12)
 
-# Цикл времени напоминания: 0 (выкл) → 15 → 30 → 60 → 0
-REMINDER_CYCLE = {0: 15, 15: 30, 30: 60, 60: 0}
+# Цикл личных напоминаний: выкл → 15 → 30 → 60 → 90 → 120 → 180 → выкл
+REMINDER_CYCLE = {0: 15, 15: 30, 30: 60, 60: 90, 90: 120, 120: 180, 180: 0}
 
 
 # ─── Инициализация при старте бота ────────────────────────────────────────────
@@ -752,8 +753,6 @@ async def send_lesson_reminder_dm(app, lesson: dict, telegram_id: int, minutes: 
 
 
 async def schedule_daily_reminders(app):
-    if not TG_CHANNEL:
-        return
     today = date.today()
     try:
         lessons = _get_lessons_for_date(today)
@@ -761,21 +760,23 @@ async def schedule_daily_reminders(app):
         log.error("Ошибка расписания для напоминаний: %s", e)
         return
     now       = datetime.now(MOSCOW_TZ)
-    scheduled = 0
+    scheduled_channel = 0
+    scheduled_dm = 0
 
-    # Напоминание в канал за 30 мин
-    for lesson in lessons:
-        remind_dt = lesson["dtstart"] - timedelta(minutes=30)
-        if remind_dt > now:
-            scheduler.add_job(
-                send_lesson_reminder,
-                "date",
-                run_date=remind_dt,
-                args=[app, lesson],
-                id=f"reminder_{lesson['uid']}",
-                replace_existing=True,
-            )
-            scheduled += 1
+    # Напоминания в канал выключены по умолчанию: время выхода у всех разное.
+    if TG_CHANNEL and CHANNEL_REMINDERS:
+        for lesson in lessons:
+            remind_dt = lesson["dtstart"] - timedelta(minutes=30)
+            if remind_dt > now:
+                scheduler.add_job(
+                    send_lesson_reminder,
+                    "date",
+                    run_date=remind_dt,
+                    args=[app, lesson],
+                    id=f"reminder_{lesson['uid']}",
+                    replace_existing=True,
+                )
+                scheduled_channel += 1
 
     # Персональные DM-напоминания
     users = get_all_users()
@@ -794,9 +795,16 @@ async def schedule_daily_reminders(app):
                     id=f"reminder_dm_{lesson['uid']}_{u['telegram_id']}",
                     replace_existing=True,
                 )
+                scheduled_dm += 1
 
-    if scheduled:
-        log.info("Запланировано напоминаний в канал: %d", scheduled)
+    log.info("Запланировано напоминаний: канал=%d, личные=%d", scheduled_channel, scheduled_dm)
+
+
+def _clear_user_reminders(telegram_id: int):
+    suffix = f"_{telegram_id}"
+    for job in scheduler.get_jobs():
+        if job.id.startswith("reminder_dm_") and job.id.endswith(suffix):
+            job.remove()
 
 
 async def sync_all_yandex_calendars(app=None) -> tuple[int, int]:
@@ -1056,6 +1064,9 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         current  = user.get("reminder_minutes", 0)
         next_val = REMINDER_CYCLE.get(current, 0)
         set_reminder_minutes(tid, next_val)
+        _clear_user_reminders(tid)
+        if next_val:
+            await schedule_daily_reminders(ctx.application)
         label = f"{next_val} мин" if next_val else "выкл"
         await query.answer(f"⏰ Напоминания: {label}")
         user = get_user(tid)
